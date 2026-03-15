@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.matias.domain.model.Rol;
 import com.matias.security.csrf.SpaCsrfTokenRequestHandler;
 import com.matias.security.filter.JwtFilter;
+import com.matias.security.ratelimit.filter.RateLimitFilter;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -35,6 +36,7 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
+import org.springframework.beans.factory.annotation.Autowired;
 
 @Slf4j
 @Configuration
@@ -53,6 +55,9 @@ public class SecurityConfig {
 
     private final JwtFilter jwtFilter;
     private final UserDetailsService userDetailsService;
+
+    @Autowired(required = false)
+    private RateLimitFilter rateLimitFilter;
 
     @Bean
     public PasswordEncoder passwordEncoder() {
@@ -74,8 +79,15 @@ public class SecurityConfig {
                 .csrf(this::configureCsrf)
                 .sessionManagement(this::configureSessionManagement)
                 .authorizeHttpRequests(this::configureAuthorization)
-                .exceptionHandling(this::configureExceptionHandling)
-                .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);
+                .exceptionHandling(this::configureExceptionHandling);
+
+        // Agregar Rate Limit Filter si está habilitado
+        if (rateLimitFilter != null) {
+            http.addFilterBefore(rateLimitFilter, UsernamePasswordAuthenticationFilter.class);
+            log.info("RateLimitFilter agregado a la cadena de seguridad");
+        }
+
+        http.addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
     }
