@@ -1,453 +1,289 @@
-# Auth DTOs Migration
+# Migración de DTOs de Autenticación
 
-## Overview
+## Resumen
+Este documento describe la migración completa de los DTOs de autenticación desde el proyecto `seguridad-back` hacia `security-backend`, siguiendo los principios de arquitectura hexagonal del proyecto.
 
-This document details the migration of DTOs (Data Transfer Objects) from the legacy `seguridad-back` project to the `security-backend` project, specifically for the `/v1/auth` API endpoints.
+## Fecha de Migración
+15 de Marzo de 2026
 
-**Migration Date:** March 15, 2026  
-**Source Project:** `C:\Proyectos\seguridad-back`  
-**Target Project:** `C:\Proyectos\security-backend`  
-**Scope:** Authentication DTOs and custom validation annotations
+## 1. DTOs Migrados
 
-## Architecture Compliance
-
-This migration follows the hexagonal architecture principles established in `security-backend`:
-
-- **DTOs Location:** Moved to the `application` module (application layer)
-- **Validation Annotations:** Custom validators placed in `application` module
-- **Separation of Concerns:** Web layer (`web` module) only handles HTTP concerns
-- **Domain Independence:** Application DTOs are independent of web framework specifics
-
-## Migrated Components
-
-### 1. Custom Validation Annotations
-
-#### 1.1 Password Validation
-
-**Location:** `application/src/main/java/com/matias/application/validation/`
-
-- **`@Password`** - Custom annotation for password validation
-  - Validates minimum length (8 characters)
-  - Requires at least one uppercase letter
-  - Requires at least one lowercase letter
-  - Requires at least one digit
-  - Requires at least one special character (!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?)
+### 1.1 DTOs de Request (application/dto/request)
+- **RegistroRequest**: DTO para registro de usuarios
+  - Validaciones: `@Email`, `@NotBlank`, `@Password`, `@CharactersWithWhiteSpaces`
+  - Campos: nombre, apellido, telefono, email, password
   
-- **`PasswordValidator`** - Implementation of the password validation logic
+- **LogueoRequest**: DTO para inicio de sesión
+  - Validaciones: `@Email`, `@NotBlank`
+  - Campos: email, password
 
-**Usage Example:**
-```java
-@Password
-private String password;
-```
-
-#### 1.2 Characters with White Spaces Validation
-
-**Location:** `application/src/main/java/com/matias/application/validation/`
-
-- **`@CharactersWithWhiteSpaces`** - Custom annotation for alphanumeric validation with spaces
-  - Allows letters (a-z, A-Z)
-  - Allows digits (0-9)
-  - Allows spaces
-  - Minimum length: 1 character
-  - Maximum length: 50 characters
-
-- **`CharactersWithWhiteSpacesValidator`** - Implementation of the validation logic
-
-**Usage Example:**
-```java
-@CharactersWithWhiteSpaces
-private String nombre;
-```
-
-### 2. Request DTOs
-
-#### 2.1 RegistroRequest (Registration Request)
-
-**Location:** `application/src/main/java/com/matias/application/dto/request/RegistroRequest.java`
-
-**Purpose:** Captures user registration data
-
-**Fields:**
-- `nombre` (String) - User's first name
-  - Validation: `@NotBlank`, `@CharactersWithWhiteSpaces`
+### 1.2 DTOs de Response (application/dto/response)
+- **RegistroResponse**: Respuesta del registro exitoso
+  - Campos: id, nombre, apellido, email, createdAt
   
-- `apellido` (String) - User's last name
-  - Validation: `@NotBlank`, `@CharactersWithWhiteSpaces`
-  
-- `email` (String) - User's email address
-  - Validation: `@NotBlank`, `@Email`
-  
-- `password` (String) - User's password
-  - Validation: `@NotBlank`, `@Password`
+- **TokenResponse**: Respuesta con token de autenticación
+  - Campos: token, expirationTime
 
-**OpenAPI Documentation:** Fully annotated with `@Schema` for API documentation
+### 1.3 DTOs Internos (application/dto/internal)
+- **TokenInternal**: DTO interno para gestión de tokens
+  - Campos: token, expirationTime
 
-#### 2.2 LogueoRequest (Login Request)
+## 2. Validadores Personalizados
 
-**Location:** `application/src/main/java/com/matias/application/dto/request/LogueoRequest.java`
+### 2.1 @Password
+- **Ubicación**: `application/validation/Password.java` y `PasswordValidator.java`
+- **Propósito**: Validar que la contraseña cumpla con los requisitos de seguridad
+- **Reglas**:
+  - Mínimo 8 caracteres
+  - Al menos una letra mayúscula
+  - Al menos una letra minúscula
+  - Al menos un dígito
+  - Al menos un carácter especial (@$!%*?&)
+  - Solo caracteres alfanuméricos y especiales permitidos
 
-**Purpose:** Captures user authentication credentials
+### 2.2 @CharactersWithWhiteSpaces
+- **Ubicación**: `application/validation/CharactersWithWhiteSpaces.java` y `CharactersWithWhiteSpacesValidator.java`
+- **Propósito**: Validar que el texto solo contenga letras y espacios
+- **Reglas**: Solo permite letras (a-z, A-Z, áéíóúÁÉÍÓÚñÑ) y espacios
 
-**Fields:**
-- `email` (String) - User's email address
-  - Validation: `@NotBlank`, `@Email`
-  
-- `password` (String) - User's password
-  - Validation: `@NotBlank`
+## 3. Servicios Implementados
 
-**OpenAPI Documentation:** Fully annotated with `@Schema` for API documentation
+### 3.1 AuthService y AuthServiceImpl
+- **Ubicación**: 
+  - Interface: `application/service/AuthService.java`
+  - Implementación: `application/service/impl/AuthServiceImpl.java`
+- **Métodos**:
+  - `registrar(RegistroRequest)`: Registra un nuevo usuario
+  - `loguear(LogueoRequest)`: Autentica un usuario y genera token
 
-### 3. Response DTOs
+### 3.2 Implementación de AuthService
+- Utiliza `UsuarioRepositoryPort` para acceso a datos
+- Utiliza `TokenServicePort` para generación de tokens
+- Utiliza `PasswordEncoder` para cifrado de contraseñas
+- Manejo de excepciones para casos de error
 
-#### 3.1 RegistroResponse (Registration Response)
+## 4. Controlador REST
 
-**Location:** `application/src/main/java/com/matias/application/dto/response/RegistroResponse.java`
+### 4.1 AuthController
+- **Ubicación**: `web/controller/AuthController.java`
+- **Base Path**: `/v1/auth`
+- **Endpoints**:
+  - `POST /v1/auth/registro`: Registra un nuevo usuario
+    - Request: `RegistroRequest`
+    - Response: `RegistroResponse` (201 Created)
+  - `POST /v1/auth/login`: Autentica un usuario
+    - Request: `LogueoRequest`
+    - Response: `TokenResponse` (200 OK)
 
-**Purpose:** Returns data about the newly registered user
+## 5. Migración de Componentes de Seguridad
 
-**Fields:**
-- `id` (Integer) - User's unique identifier
-- `email` (String) - User's email address
+### 5.1 TokenServiceImpl
+- **Ubicación**: `security/jwt/TokenServiceImpl.java`
+- **Propósito**: Implementa `TokenServicePort` para generación y validación de JWT
+- **Funcionalidades**:
+  - Generación de tokens JWT
+  - Validación de tokens
+  - Extracción de claims
+  - Configuración mediante properties
 
-**Implementation:** Java Record for immutability
+### 5.2 JwtFilter
+- **Ubicación**: `security/filter/JwtFilter.java`
+- **Propósito**: Filtro para validar JWT en cada request
+- **Funcionamiento**:
+  - Extrae token del header Authorization
+  - Valida el token
+  - Establece autenticación en SecurityContext
 
-#### 3.2 TokenResponse (Token Response)
+### 5.3 SpaCsrfTokenRequestHandler
+- **Ubicación**: `security/csrf/SpaCsrfTokenRequestHandler.java`
+- **Propósito**: Manejador de tokens CSRF para Single Page Applications
+- **Características**:
+  - Resuelve y carga tokens CSRF
+  - Compatible con aplicaciones SPA
 
-**Location:** `application/src/main/java/com/matias/application/dto/response/TokenResponse.java`
+### 5.4 UserDetailsServiceImpl
+- **Ubicación**: `security/service/UserDetailsServiceImpl.java`
+- **Propósito**: Implementa `UserDetailsService` de Spring Security
+- **Funcionalidades**:
+  - Carga usuarios desde el repositorio
+  - Carga roles asociados con JOIN FETCH
+  - Convierte a `SecurityUser` para Spring Security
 
-**Purpose:** Returns JWT access token to the client
+### 5.5 SecurityConfig
+- **Ubicación**: `security/config/SecurityConfig.java`
+- **Propósito**: Configuración central de Spring Security
+- **Configuraciones**:
+  - Endpoints públicos y protegidos
+  - Configuración CSRF con handler personalizado
+  - Integración del JwtFilter
+  - CORS habilitado
+  - Session management STATELESS
+  - PasswordEncoder (BCrypt)
 
-**Fields:**
-- `accessToken` (String) - JWT access token (short-lived)
+## 6. Configuración de Propiedades
 
-**Implementation:** Java Record for immutability
+### 6.1 application.properties
+- **Ubicación**: `app-root/src/main/resources/application.properties`
+- **Propiedades JWT**:
+  ```properties
+  jwt.secret=your_secret_key_here_should_be_at_least_256_bits
+  jwt.expiration-time=86400000
+  ```
 
-### 4. Internal DTOs
+## 7. Actualizaciones en Base de Datos
 
-#### 4.1 TokenInternal
+### 7.1 UsuarioRepositoryPort
+- **Nuevo método**: `findByEmailWithRoles(String email)`
+- **Propósito**: Cargar usuario con roles en una sola consulta
 
-**Location:** `application/src/main/java/com/matias/application/dto/internal/TokenInternal.java`
+### 7.2 UsuarioRepositoryAdapter
+- **Implementación** del método `findByEmailWithRoles`
 
-**Purpose:** Internal DTO for passing both access and refresh tokens between layers
+### 7.3 UsuarioJpaRepository
+- **Query JPQL**:
+  ```java
+  @Query("SELECT u FROM UsuarioEntity u LEFT JOIN FETCH u.usuarioRoles WHERE u.email = :email")
+  Optional<UsuarioEntity> findByEmailWithRoles(@Param("email") String email);
+  ```
 
-**Fields:**
-- `accessToken` (String) - JWT access token
-- `refreshToken` (String) - JWT refresh token
+## 8. Dependencias Agregadas
 
-**Implementation:** Java Record for immutability  
-**Note:** Marked with `@Hidden` to exclude from OpenAPI documentation
-
-## Updated Services and Controllers
-
-### AuthService Interface
-
-**Location:** `application/src/main/java/com/matias/application/service/AuthService.java`
-
-**Updated Method Signatures:**
-```java
-RegistroResponse register(RegistroRequest request);
-TokenInternal login(LogueoRequest request);
-TokenInternal refresh(String refreshToken);
-void logout(String refreshToken);
-void verificarEmail(String token);
-void reenviarEmailVerificacion(Object request, String ipOrigen);
-void solicitarReseteoPassword(Object request, String ipOrigen);
-void validarTokenReset(String token);
-void resetearPassword(Object request);
-```
-
-**Changes:**
-- Updated imports to use DTOs from `application` module
-- Return types updated to use new DTOs
-
-### AuthController
-
-**Location:** `web/src/main/java/com/matias/web/controller/AuthController.java`
-
-**Updates:**
-- Imports changed from `com.matias.web.dto.*` to `com.matias.application.dto.*`
-- All endpoint handlers now use DTOs from the application layer
-- Maintains HTTP-specific concerns (cookies, response headers, etc.)
-
-**Endpoint Structure:**
-- `POST /v1/auth/register` - User registration
-- `POST /v1/auth/login` - User authentication
-- `POST /v1/auth/refresh` - Token refresh
-- `POST /v1/auth/logout` - User logout
-- `POST /v1/auth/verify` - Email verification
-
-## Dependency Updates
-
-### Application Module (application/pom.xml)
-
-**Added Dependencies:**
+### 8.1 Módulo security (security/pom.xml)
 ```xml
-<!-- Spring Validation -->
+<!-- JWT -->
+<dependency>
+    <groupId>io.jsonwebtoken</groupId>
+    <artifactId>jjwt-api</artifactId>
+    <version>0.12.5</version>
+</dependency>
+<dependency>
+    <groupId>io.jsonwebtoken</groupId>
+    <artifactId>jjwt-impl</artifactId>
+    <version>0.12.5</version>
+    <scope>runtime</scope>
+</dependency>
+<dependency>
+    <groupId>io.jsonwebtoken</groupId>
+    <artifactId>jjwt-jackson</artifactId>
+    <version>0.12.5</version>
+    <scope>runtime</scope>
+</dependency>
+
+<!-- Web y Transaccional -->
+<dependency>
+    <groupId>org.springframework.boot</groupId>
+    <artifactId>spring-boot-starter-web</artifactId>
+</dependency>
+<dependency>
+    <groupId>org.springframework</groupId>
+    <artifactId>spring-tx</artifactId>
+</dependency>
+```
+
+### 8.2 Módulo application (application/pom.xml)
+```xml
+<!-- Validación -->
 <dependency>
     <groupId>org.springframework.boot</groupId>
     <artifactId>spring-boot-starter-validation</artifactId>
 </dependency>
+```
 
-<!-- OpenAPI Documentation -->
+### 8.3 Módulo web (web/pom.xml)
+```xml
+<!-- Web -->
 <dependency>
-    <groupId>org.springdoc</groupId>
-    <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
-    <version>2.3.0</version>
+    <groupId>org.springframework.boot</groupId>
+    <artifactId>spring-boot-starter-web</artifactId>
 </dependency>
 ```
 
-**Rationale:**
-- `spring-boot-starter-validation` - Required for custom validators and Jakarta Validation API
-- `springdoc-openapi-starter-webmvc-ui` - Required for `@Schema` annotations on DTOs
+## 9. Arquitectura Hexagonal
 
-## File Structure
+La migración respeta los principios de arquitectura hexagonal:
 
-### Before Migration
+### 9.1 Capa de Dominio (domain)
+- **Modelo**: `Usuario`, `Rol`
+- **Puertos**: `UsuarioRepositoryPort`, `TokenServicePort`
+- Sin dependencias de frameworks
+
+### 9.2 Capa de Aplicación (application)
+- **DTOs**: Request, Response, Internal
+- **Validadores**: Validaciones de negocio personalizadas
+- **Servicios**: `AuthService` con lógica de negocio
+- Depende solo del dominio
+
+### 9.3 Capa de Infraestructura
+- **database**: Adaptadores JPA y entidades
+- **security**: Implementación de seguridad con Spring Security y JWT
+- **web**: Controllers REST
+- Implementan los puertos del dominio
+
+## 10. Flujo de Autenticación
+
+### 10.1 Registro de Usuario
+1. Cliente envía `POST /v1/auth/registro` con `RegistroRequest`
+2. `AuthController` valida y delega a `AuthService`
+3. `AuthService` cifra password y guarda usuario
+4. Retorna `RegistroResponse` con datos del usuario
+
+### 10.2 Login de Usuario
+1. Cliente envía `POST /v1/auth/login` con `LogueoRequest`
+2. `AuthController` delega a `AuthService`
+3. `AuthService` valida credenciales
+4. `TokenServiceImpl` genera JWT
+5. Retorna `TokenResponse` con token y expiración
+
+### 10.3 Autenticación de Requests
+1. `JwtFilter` intercepta el request
+2. Extrae token del header Authorization
+3. Valida token con `TokenServiceImpl`
+4. Establece autenticación en `SecurityContext`
+5. Request continúa a su destino
+
+## 11. Testing y Compilación
+
+### 11.1 Resultado de Compilación
 ```
-web/
-└── src/main/java/com/matias/web/
-    ├── dto/
-    │   ├── request/
-    │   │   ├── RegistroRequest.java
-    │   │   └── LogueoRequest.java
-    │   ├── response/
-    │   │   ├── RegistroResponse.java
-    │   │   └── TokenResponse.java
-    │   └── internal/
-    │       └── TokenInternal.java
-    └── validation/
-        ├── Password.java
-        ├── PasswordValidator.java
-        ├── CharactersWithWhiteSpaces.java
-        └── CharactersWithWhiteSpacesValidator.java
-```
-
-### After Migration
-```
-application/
-└── src/main/java/com/matias/application/
-    ├── dto/
-    │   ├── request/
-    │   │   ├── RegistroRequest.java
-    │   │   └── LogueoRequest.java
-    │   ├── response/
-    │   │   ├── RegistroResponse.java
-    │   │   └── TokenResponse.java
-    │   └── internal/
-    │       └── TokenInternal.java
-    ├── validation/
-    │   ├── Password.java
-    │   ├── PasswordValidator.java
-    │   ├── CharactersWithWhiteSpaces.java
-    │   └── CharactersWithWhiteSpacesValidator.java
-    └── service/
-        └── AuthService.java
-
-web/
-└── src/main/java/com/matias/web/
-    ├── dto/
-    │   └── ProductDto.java  (preserved - not part of auth migration)
-    └── controller/
-        └── AuthController.java
+[INFO] BUILD SUCCESS
+[INFO] Total time: 17.754 s
 ```
 
-## Removed Files
+Todos los módulos compilaron exitosamente:
+- domain ✓
+- application ✓
+- database ✓
+- security ✓
+- web ✓
+- app-root ✓
 
-The following files were removed from the `web` module after successful migration:
+## 12. Próximos Pasos
 
-**Validation Annotations:**
-- `web/src/main/java/com/matias/web/validation/Password.java`
-- `web/src/main/java/com/matias/web/validation/PasswordValidator.java`
-- `web/src/main/java/com/matias/web/validation/CharactersWithWhiteSpaces.java`
-- `web/src/main/java/com/matias/web/validation/CharactersWithWhiteSpacesValidator.java`
+1. **Testing**: Crear tests unitarios y de integración para:
+   - Validadores personalizados
+   - AuthService
+   - AuthController
+   - Componentes de seguridad
 
-**DTOs:**
-- `web/src/main/java/com/matias/web/dto/request/RegistroRequest.java`
-- `web/src/main/java/com/matias/web/dto/request/LogueoRequest.java`
-- `web/src/main/java/com/matias/web/dto/response/RegistroResponse.java`
-- `web/src/main/java/com/matias/web/dto/response/TokenResponse.java`
-- `web/src/main/java/com/matias/web/dto/internal/TokenInternal.java`
+2. **Documentación API**: Agregar Swagger/OpenAPI para documentar endpoints
 
-**Note:** `ProductDto.java` was preserved in the `web` module as it's not part of the auth migration scope.
+3. **Migración adicional**: Continuar con otros módulos de seguridad-back si es necesario
 
-## Build Verification
+4. **Configuración de Base de Datos**: Agregar scripts de inicialización si se requieren
 
-The project was successfully compiled with:
-- **Java Version:** 21
-- **Spring Boot Version:** 3.5.11
-- **Build Tool:** Maven
+5. **Variables de Entorno**: Externalizar configuraciones sensibles (jwt.secret)
 
-**Build Command:**
-```bash
-mvn clean compile
-```
+## 13. Notas Importantes
 
-**Build Result:** ✅ SUCCESS
-- All modules compiled without errors
-- All dependencies resolved correctly
-- No compilation warnings related to the migration
+- Todos los DTOs incluyen validaciones de Bean Validation
+- Las contraseñas se cifran con BCrypt
+- Los tokens JWT tienen tiempo de expiración configurable
+- La configuración CSRF está adaptada para SPAs
+- El filtro JWT solo procesa requests con token Bearer
+- Los endpoints de autenticación son públicos (no requieren token)
 
-## Benefits of This Migration
+## 14. Referencias
 
-1. **Architectural Alignment:** DTOs are now in the correct layer according to hexagonal architecture
-2. **Reusability:** Application-layer DTOs can be used by different adapters (not just web)
-3. **Domain Independence:** Application logic is isolated from web framework specifics
-4. **Testability:** DTOs can be tested independently of the web layer
-5. **Maintainability:** Clear separation of concerns makes the codebase easier to maintain
-6. **Scalability:** Easier to add new adapters (e.g., gRPC, GraphQL) in the future
-
-## Next Steps
-
-The following features mentioned in `AuthService` still need implementation:
-
-1. **Email Verification Flow**
-   - `verificarEmail(String token)` - Verify email with token
-   - `reenviarEmailVerificacion(Object request, String ipOrigen)` - Resend verification email
-
-2. **Password Reset Flow**
-   - `solicitarReseteoPassword(Object request, String ipOrigen)` - Request password reset
-   - `validarTokenReset(String token)` - Validate reset token
-   - `resetearPassword(Object request)` - Reset password with token
-
-**Recommendation:** Create specific DTOs for these operations following the same pattern established in this migration.
-
-## References
-
-- [Architecture Documentation](../architecture.md)
-- [CRUD Concepts](../crud-concepts.md)
-- [Hexagonal Architecture Pattern](https://alistair.cockburn.us/hexagonal-architecture/)
-
-## Migration Checklist
-
-- [x] Analyze DTOs in legacy project
-- [x] Create custom validation annotations in `application` module
-- [x] Create request DTOs in `application` module
-- [x] Create response DTOs in `application` module
-- [x] Create internal DTOs in `application` module
-- [x] Update `AuthService` interface with new DTOs
-- [x] Update `AuthController` imports
-- [x] Add required dependencies to `application/pom.xml`
-- [x] Remove old files from `web` module
-- [x] Verify successful compilation
-- [x] Document migration process
-
----
-
-## Implementation Status Update
-
-### AuthServiceImpl Implementation
-
-**Location:** `application/src/main/java/com/matias/application/service/impl/AuthServiceImpl.java`
-
-**Status:** ✅ COMPLETED
-
-**Implemented Methods:**
-- ✅ `register(RegistroRequest request)` - Complete user registration with password encryption
-- ✅ `login(LogueoRequest request)` - Authentication with password verification and token generation
-- ✅ `refresh(String refreshToken)` - Token refresh functionality
-- ⚠️ `logout(String refreshToken)` - Basic structure (TODO: implement token blacklist)
-- ⚠️ `verificarEmail(String token)` - Stub implementation (TODO: complete)
-- ⚠️ `reenviarEmailVerificacion(...)` - Stub implementation (TODO: complete)
-- ⚠️ `solicitarReseteoPassword(...)` - Stub implementation (TODO: complete)
-- ⚠️ `validarTokenReset(String token)` - Stub implementation (TODO: complete)
-- ⚠️ `resetearPassword(...)` - Stub implementation (TODO: complete)
-
-**Dependencies:**
-- `UsuarioRepositoryPort` - For database operations
-- `TokenServicePort` - For JWT token generation
-- `PasswordEncoder` - For password hashing (BCrypt)
-
-### Infrastructure Updates
-
-#### 1. UsuarioRepositoryPort Enhancement
-**Location:** `domain/src/main/java/com/matias/domain/port/UsuarioRepositoryPort.java`
-
-**Added Method:**
-```java
-Optional<Usuario> findByEmail(String email);
-```
-
-#### 2. UsuarioRepositoryAdapter Update
-**Location:** `database/src/main/java/com/matias/database/adapter/UsuarioRepositoryAdapter.java`
-
-**Implemented:**
-```java
-@Override
-public Optional<Usuario> findByEmail(String email) {
-    return jpaRepository.findByEmail(email)
-            .map(usuarioMapper::toDomain);
-}
-```
-
-#### 3. UsuarioJpaRepository Update
-**Location:** `database/src/main/java/com/matias/database/repository/UsuarioJpaRepository.java`
-
-**Added Query Methods:**
-```java
-Optional<UsuarioEntity> findByEmail(String email);
-long countByActivo(boolean activo);
-long countByEmailVerificado(boolean verificado);
-long countByFechaCreacionAfter(Instant date);
-```
-
-#### 4. SecurityConfig Enhancement
-**Location:** `security/src/main/java/com/matias/security/config/SecurityConfig.java`
-
-**Added Bean:**
-```java
-@Bean
-public PasswordEncoder passwordEncoder() {
-    return new BCryptPasswordEncoder();
-}
-```
-
-### Application Status
-
-**Build Status:** ✅ SUCCESS  
-**Runtime Status:** ✅ RUNNING  
-**Port:** 8081  
-**Database:** H2 (in-memory)
-
-**Verification Results:**
-- Application starts successfully
-- All beans are properly configured and injected
-- Security configuration is active
-- JPA repositories are initialized
-- Authentication endpoints are exposed
-
-### Current API Endpoints
-
-**Available:**
-- ✅ `POST /v1/auth/register` - User registration (fully functional)
-- ✅ `POST /v1/auth/login` - User login (fully functional)
-- ✅ `POST /v1/auth/refresh` - Token refresh (fully functional)
-- ⚠️ `POST /v1/auth/logout` - Logout (basic implementation, needs token blacklist)
-- ⚠️ `POST /v1/auth/verify` - Email verification (endpoint exists, needs implementation)
-
-### Remaining Tasks
-
-**High Priority:**
-1. Implement token blacklist for logout functionality
-2. Implement email verification flow
-3. Implement password reset flow
-4. Add comprehensive error handling
-5. Add integration tests
-
-**Medium Priority:**
-1. Configure JWT token expiration times
-2. Add refresh token rotation
-3. Implement rate limiting for sensitive endpoints
-4. Add audit logging
-
-**Low Priority:**
-1. Add metrics and monitoring
-2. Optimize database queries
-3. Add caching layer
-4. Implement account lockout after failed attempts
-
----
-
-**Document Version:** 1.1  
-**Last Updated:** March 15, 2026 (Updated with implementation details)  
-**Author:** Migration Team
+- Documentación de arquitectura: `docs/architecture.md`
+- Conceptos CRUD: `docs/crud-concepts.md`
+- Código fuente del proyecto original: `C:\Proyectos\seguridad-back`

@@ -10,6 +10,7 @@ import com.matias.domain.port.UsuarioRepositoryPort;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
+import java.time.Instant;
 import java.util.Optional;
 
 @Component
@@ -27,6 +28,12 @@ public class UsuarioRepositoryAdapter implements UsuarioRepositoryPort {
     @Override
     public Optional<Usuario> findByEmail(String email) {
         return jpaRepository.findByEmail(email).map(usuarioMapper::toDomain);
+    }
+
+    @Override
+    public Optional<Usuario> findByEmailWithRoles(String email) {
+        return jpaRepository.findByEmailWithRoles(email)
+                .map(usuarioMapper::toDomain);
     }
 
     @Override
@@ -87,7 +94,7 @@ public class UsuarioRepositoryAdapter implements UsuarioRepositoryPort {
     }
 
     @Override
-    public long countByFechaCreacionAfter(java.time.Instant date) {
+    public long countByFechaCreacionAfter(Instant date) {
         return jpaRepository.countByFechaCreacionAfter(date);
     }
 }

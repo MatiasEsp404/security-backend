@@ -6,34 +6,46 @@ import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
 import jakarta.annotation.PostConstruct;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.convert.DurationUnit;
 import org.springframework.stereotype.Service;
 
 import javax.crypto.SecretKey;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.time.Duration;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.Base64;
 import java.util.Date;
 import java.util.List;
 import java.util.Set;
 import java.util.function.Function;
 
+@Slf4j
 @Service
 public class TokenServiceImpl implements TokenServicePort {
 
-    @Value("${jwt.secret:1234567890123456789012345678901234567890}")
+    @Value("${jwt.secret}")
     private String secretKey;
 
-    private final long accessExpirationMillis = 1000 * 60 * 15; // 15 mins
-    private final long refreshExpirationMillis = 1000 * 60 * 60 * 24 * 7; // 7 days
+    @DurationUnit(ChronoUnit.MILLIS)
+    @Value("${jwt.access-token.expiration}")
+    private Duration accessExpiration;
+
+    @DurationUnit(ChronoUnit.MILLIS)
+    @Value("${jwt.refresh-token.expiration}")
+    private Duration refreshExpiration;
 
     @PostConstruct
     public void validateSecretKey() {
-        int keyBits = secretKey.getBytes(StandardCharsets.UTF_8).length * 8;
+        int keyBits = secretKey.getBytes().length * 8;
         if (keyBits < 256) {
-            System.err.println("JWT secret key es menor a 256 bits.");
+            log.warn("JWT secret key es menor a 256 bits. Longitud actual: {} bits. Configura una clave más segura en producción.", keyBits);
+        } else {
+            log.info("JWT secret key configurada correctamente ({} bits)", keyBits);
         }
     }
 
@@ -52,7 +64,18 @@ public class TokenServiceImpl implements TokenServicePort {
         if (!userEmail.equals(email) || isTokenExpired(token)) {
             return false;
         }
+
+        // TODO: Implementar verificación de tokens invalidados cuando se agregue el repositorio
+        // Para ello se necesitará inyectar TokenInvalidoRepository y verificar:
+        // 1. Que el access token no esté invalidado explícitamente
+        // 2. Que el refresh token asociado (vía sid) no esté invalidado
+
         return true;
+    }
+
+    public String extractSessionId(String token) {
+        Claims claims = extractAllClaims(token);
+        return claims.get("sid", String.class);
     }
 
     private boolean isTokenExpired(String token) {
@@ -61,7 +84,7 @@ public class TokenServiceImpl implements TokenServicePort {
 
     @Override
     public String generateAccessToken(String email, Set<Rol> roles, String refreshToken) {
-        List<String> rolesStr = (roles != null) ? roles.stream().map(Rol::name).toList() : List.of();
+        List<String> rolesStr = roles.stream().map(Rol::name).toList();
         String sid = generateSessionId(refreshToken);
 
         return Jwts.builder()
@@ -69,19 +92,18 @@ public class TokenServiceImpl implements TokenServicePort {
                 .claim("roles", rolesStr)
                 .claim("sid", sid)
                 .issuedAt(new Date())
-                .expiration(new Date(System.currentTimeMillis() + accessExpirationMillis))
+                .expiration(new Date(System.currentTimeMillis() + accessExpiration.toMillis()))
                 .signWith(getSigningKey(), Jwts.SIG.HS256)
                 .compact();
     }
 
     private String generateSessionId(String refreshToken) {
-        if (refreshToken == null) return null;
         try {
             MessageDigest digest = MessageDigest.getInstance("SHA-256");
             byte[] hash = digest.digest(refreshToken.getBytes(StandardCharsets.UTF_8));
             return Base64.getUrlEncoder().withoutPadding().encodeToString(hash);
         } catch (NoSuchAlgorithmException e) {
-            throw new IllegalStateException("SHA-256 no está disponible", e);
+            throw new IllegalStateException("SHA-256 no está disponible en este entorno", e);
         }
     }
 
@@ -90,7 +112,7 @@ public class TokenServiceImpl implements TokenServicePort {
         return Jwts.builder()
                 .subject(email)
                 .issuedAt(new Date())
-                .expiration(new Date(System.currentTimeMillis() + refreshExpirationMillis))
+                .expiration(new Date(System.currentTimeMillis() + refreshExpiration.toMillis()))
                 .signWith(getSigningKey(), Jwts.SIG.HS256)
                 .compact();
     }
@@ -126,6 +148,6 @@ public class TokenServiceImpl implements TokenServicePort {
         Date expiration = claims.getExpiration();
         long duracionToken = expiration.getTime() - issuedAt.getTime();
         long margen = 5000;
-        return Math.abs(duracionToken - refreshExpirationMillis) < margen;
+        return Math.abs(duracionToken - refreshExpiration.toMillis()) < margen;
     }
 }

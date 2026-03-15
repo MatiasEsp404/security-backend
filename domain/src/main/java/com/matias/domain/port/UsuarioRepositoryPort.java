@@ -8,6 +8,7 @@ import java.util.Optional;
 public interface UsuarioRepositoryPort {
     Optional<Usuario> findById(Integer id);
     Optional<Usuario> findByEmail(String email);
+    Optional<Usuario> findByEmailWithRoles(String email);
     Usuario save(Usuario usuario);
     void updateStatus(Integer id, boolean active);
     void assignRole(Integer userId, Rol rol);
