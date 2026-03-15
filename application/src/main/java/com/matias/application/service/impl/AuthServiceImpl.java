@@ -4,21 +4,29 @@ import com.matias.application.dto.internal.TokenInternal;
 import com.matias.application.dto.request.LogueoRequest;
 import com.matias.application.dto.request.RegistroRequest;
 import com.matias.application.dto.response.RegistroResponse;
+import com.matias.application.email.VerificationEmailTemplate;
 import com.matias.application.service.AuthService;
 import com.matias.domain.exception.AccesoDenegadoException;
 import com.matias.domain.exception.ConflictoException;
 import com.matias.domain.exception.NoAutenticadoException;
+import com.matias.domain.exception.OperacionNoPermitidaException;
 import com.matias.domain.exception.RecursoNoEncontradoException;
 import com.matias.domain.model.Rol;
+import com.matias.domain.model.TokenVerificacion;
 import com.matias.domain.model.Usuario;
+import com.matias.domain.port.EmailServicePort;
 import com.matias.domain.port.TokenServicePort;
+import com.matias.domain.port.TokenVerificacionRepositoryPort;
 import com.matias.domain.port.UsuarioRepositoryPort;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.Set;
+import java.util.UUID;
 
 @Slf4j
 @Service
@@ -27,13 +35,28 @@ public class AuthServiceImpl implements AuthService {
     private final UsuarioRepositoryPort usuarioRepository;
     private final TokenServicePort tokenService;
     private final PasswordEncoder passwordEncoder;
+    private final TokenVerificacionRepositoryPort tokenVerificacionRepository;
+    private final EmailServicePort emailService;
+
+    @Value("${app.back-url}")
+    private String backUrl;
+
+    @Value("${app.front-url}")
+    private String frontUrl;
+
+    @Value("${app.verification.token.expiration-hours:24}")
+    private int tokenExpirationHours;
 
     public AuthServiceImpl(UsuarioRepositoryPort usuarioRepository, 
                           TokenServicePort tokenService,
-                          PasswordEncoder passwordEncoder) {
+                          PasswordEncoder passwordEncoder,
+                          TokenVerificacionRepositoryPort tokenVerificacionRepository,
+                          EmailServicePort emailService) {
         this.usuarioRepository = usuarioRepository;
         this.tokenService = tokenService;
         this.passwordEncoder = passwordEncoder;
+        this.tokenVerificacionRepository = tokenVerificacionRepository;
+        this.emailService = emailService;
     }
 
     @Override
@@ -61,6 +84,31 @@ public class AuthServiceImpl implements AuthService {
         Usuario usuarioGuardado = usuarioRepository.save(usuario);
         
         log.info("Usuario registrado exitosamente con ID: {}", usuarioGuardado.getId());
+
+        // Generar token de verificación
+        String token = UUID.randomUUID().toString();
+        Instant expiracion = Instant.now().plus(tokenExpirationHours, ChronoUnit.HOURS);
+        
+        TokenVerificacion tokenVerificacion = new TokenVerificacion(token, expiracion, usuarioGuardado.getId());
+        tokenVerificacionRepository.save(tokenVerificacion);
+        
+        log.info("Token de verificación generado para usuario ID: {}", usuarioGuardado.getId());
+
+        // Enviar email de verificación
+        try {
+            VerificationEmailTemplate emailTemplate = new VerificationEmailTemplate(
+                    usuarioGuardado.getEmail(),
+                    usuarioGuardado.getNombre(),
+                    token,
+                    frontUrl,
+                    tokenExpirationHours + " horas"
+            );
+            emailService.send(emailTemplate);
+            log.info("Email de verificación enviado a: {}", usuarioGuardado.getEmail());
+        } catch (Exception e) {
+            log.error("Error al enviar email de verificación: {}", e.getMessage(), e);
+            // No fallar el registro si el email no se puede enviar
+        }
         
         return new RegistroResponse(
                 usuarioGuardado.getId(),
@@ -132,8 +180,39 @@ public class AuthServiceImpl implements AuthService {
     @Override
     public void verificarEmail(String token) {
         log.info("Verificando email con token");
-        // TODO: Implementar lógica de verificación de email
-        throw new UnsupportedOperationException("Funcionalidad no implementada aún");
+        
+        // Buscar token
+        TokenVerificacion tokenVerificacion = tokenVerificacionRepository.findByToken(token)
+                .orElseThrow(() -> new RecursoNoEncontradoException("Token de verificación no encontrado"));
+
+        // Validar token
+        if (tokenVerificacion.estaExpirado()) {
+            tokenVerificacion.marcarComoExpirado();
+            tokenVerificacionRepository.save(tokenVerificacion);
+            throw new OperacionNoPermitidaException("El token ha expirado. Solicite uno nuevo");
+        }
+
+        if (tokenVerificacion.estaUsado()) {
+            throw new OperacionNoPermitidaException("El token ya ha sido utilizado");
+        }
+
+        if (!tokenVerificacion.esValido()) {
+            throw new OperacionNoPermitidaException("El token no es válido");
+        }
+
+        // Buscar usuario
+        Usuario usuario = usuarioRepository.findById(tokenVerificacion.getUsuarioId())
+                .orElseThrow(() -> new RecursoNoEncontradoException("Usuario no encontrado"));
+
+        // Verificar email del usuario
+        usuario.setEmailVerificado(true);
+        usuarioRepository.save(usuario);
+
+        // Marcar token como usado
+        tokenVerificacion.marcarComoUsado();
+        tokenVerificacionRepository.save(tokenVerificacion);
+
+        log.info("Email verificado exitosamente para usuario ID: {}", usuario.getId());
     }
 
     @Override

@@ -40,12 +40,17 @@ Centralizes security configurations and filters.
 - **Contains:** `SecurityConfig` class, JWT Filters, CORS handling, strict `UserDetails` implementation for Spring Security, and authentication providers.
 - **Dependencies:** `domain` and `application` (to search and identify users internally). Relies on *spring-boot-starter-security*.
 
-### 5. `web` (Entry Point / API Presentation Layer)
+### 5. `email` (Email Service Adapter)
+Acts as the adapter for external email service providers.
+- **Contains:** Implementations of the `EmailServicePort` interface defined in `domain`, email provider properties and configuration classes. Supports multiple providers (SendGrid for production, SMTP/MailHog for development).
+- **Dependencies:** `domain` (to implement the email port). Relies on *spring-boot-starter-mail* and *sendgrid-java*.
+
+### 6. `web` (Entry Point / API Presentation Layer)
 The visible face of the system towards external consumers.
 - **Contains:** Spring MVC Controllers (`@RestController`), Data Transfer Objects (DTOs) for requests and responses, endpoint validations, and role-based access annotations like `@PreAuthorize`.
 - **Dependencies:** `application` (to execute use cases) and `security` (to apply policies on who invokes the system). Relies on *spring-boot-starter-web*.
 
-### 6. `app-root` (Bootstrap / Initializer)
+### 7. `app-root` (Bootstrap / Initializer)
 Configuration module that enables compilation and execution by assembling the entire system.
 - **Contains:** Only the main class with `@SpringBootApplication` and global properties configurations (`application.properties` or `.yml`).
 - **Dependencies:** Depends on **absolutely all** other modules and runtime libraries (e.g., Database Drivers). It strings everything together into a single JAR/WAR artifact managed by the Spring Container.
@@ -56,8 +61,9 @@ Configuration module that enables compilation and execution by assembling the en
 
 ```mermaid
 graph TD;
-    Root(6. app-root) --> Web(5. web)
+    Root(7. app-root) --> Web(6. web)
     Root --> DB(3. database)
+    Root --> Email(5. email)
     
     Web --> Sec(4. security)
     Web --> App(2. application)
@@ -66,6 +72,7 @@ graph TD;
     Sec --> Dom(1. domain)
     
     DB --> Dom
+    Email --> Dom
     
     App --> Dom
     
@@ -74,7 +81,7 @@ graph TD;
     classDef Outer fill:#bbf,stroke:#333,stroke-width:2px;
     class Root External;
     class Dom,App Core;
-    class Web,DB,Sec Outer;
+    class Web,DB,Sec,Email Outer;
 ```
 
 ### Explaining the Flow:
@@ -84,4 +91,6 @@ graph TD;
 4. **`application`** orchestrates the business logic utilizing classes and rules located in the **`domain`**.
 5. If `application` needs to retrieve or persist data, it will use a repository interface (Port) imported from `domain`.
 6. At runtime (Spring Injection), the container injects the implementation of that interface which was created and exists exclusively within the **`database`** module.
-7. All of the above is possible because the **`app-root`** module imports all dependencies in its `pom.xml`, enabling implicit classpath injection across the system in a single embedded startup environment.
+7. If `application` needs to send emails, it will use the `EmailServicePort` interface from `domain`.
+8. At runtime, the container injects the appropriate implementation from the **`email`** module (SendGrid or SMTP based on configuration).
+9. All of the above is possible because the **`app-root`** module imports all dependencies in its `pom.xml`, enabling implicit classpath injection across the system in a single embedded startup environment.
