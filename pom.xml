@@ -18,7 +18,19 @@
 		<lombok.version>1.18.36</lombok.version>
 		<mapstruct.version>1.5.5.Final</mapstruct.version>
 		<mapstruct.lombok.version>0.2.0</mapstruct.lombok.version>
+		<sendgrid.version>4.10.3</sendgrid.version>
 	</properties>
+
+	<dependencyManagement>
+		<dependencies>
+			<!-- SendGrid Java SDK -->
+			<dependency>
+				<groupId>com.sendgrid</groupId>
+				<artifactId>sendgrid-java</artifactId>
+				<version>${sendgrid.version}</version>
+			</dependency>
+		</dependencies>
+	</dependencyManagement>
 
 	<dependencies>
 		<!-- Lombok -->
@@ -57,6 +69,7 @@
 		<module>application</module>
 		<module>database</module>
 		<module>security</module>
+		<module>email</module>
 		<module>web</module>
 		<module>app-root</module>
 	</modules>
