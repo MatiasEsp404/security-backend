@@ -5,6 +5,10 @@ import com.matias.application.dto.request.LogueoRequest;
 import com.matias.application.dto.request.RegistroRequest;
 import com.matias.application.dto.response.RegistroResponse;
 import com.matias.application.service.AuthService;
+import com.matias.domain.exception.AccesoDenegadoException;
+import com.matias.domain.exception.ConflictoException;
+import com.matias.domain.exception.NoAutenticadoException;
+import com.matias.domain.exception.RecursoNoEncontradoException;
 import com.matias.domain.model.Rol;
 import com.matias.domain.model.Usuario;
 import com.matias.domain.port.TokenServicePort;
@@ -38,7 +42,7 @@ public class AuthServiceImpl implements AuthService {
         
         // Verificar si el usuario ya existe
         if (usuarioRepository.findByEmail(request.email()).isPresent()) {
-            throw new RuntimeException("El email ya está registrado");
+            throw new ConflictoException("El email ya está registrado");
         }
 
         // Crear usuario
@@ -70,16 +74,16 @@ public class AuthServiceImpl implements AuthService {
         
         // Buscar usuario
         Usuario usuario = usuarioRepository.findByEmail(request.email())
-                .orElseThrow(() -> new RuntimeException("Credenciales inválidas"));
+                .orElseThrow(() -> new NoAutenticadoException("Credenciales inválidas"));
 
         // Verificar contraseña
         if (!passwordEncoder.matches(request.password(), usuario.getPassword())) {
-            throw new RuntimeException("Credenciales inválidas");
+            throw new NoAutenticadoException("Credenciales inválidas");
         }
 
         // Verificar si el usuario está activo
         if (!usuario.getActivo()) {
-            throw new RuntimeException("Usuario inactivo");
+            throw new AccesoDenegadoException("Usuario inactivo. Contacte al administrador");
         }
 
         // Generar refresh token primero
@@ -99,7 +103,7 @@ public class AuthServiceImpl implements AuthService {
         
         // Validar que es un refresh token
         if (!tokenService.esRefreshToken(refreshToken)) {
-            throw new RuntimeException("Token inválido: no es un refresh token");
+            throw new NoAutenticadoException("Token inválido: no es un refresh token");
         }
         
         // Obtener email del token
@@ -107,7 +111,7 @@ public class AuthServiceImpl implements AuthService {
         
         // Buscar usuario
         Usuario usuario = usuarioRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
+                .orElseThrow(() -> new RecursoNoEncontradoException("Usuario no encontrado"));
 
         // Generar nuevos tokens
         String newRefreshToken = tokenService.generateRefreshToken(usuario.getEmail());
