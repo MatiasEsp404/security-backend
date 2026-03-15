@@ -1,9 +1,15 @@
 package com.matias.web.controller;
 
 import com.matias.application.service.AuthService;
+import com.matias.application.dto.internal.TokenInternal;
+import com.matias.application.dto.request.LogueoRequest;
+import com.matias.application.dto.request.RegistroRequest;
+import com.matias.application.dto.response.RegistroResponse;
+import com.matias.application.dto.response.TokenResponse;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseCookie;
@@ -15,8 +21,6 @@ import java.net.URI;
 import java.time.Duration;
 import java.util.Arrays;
 
-// Simplified version for migration respecting the architecture.
-// DTOs are mapped to Object here to avoid missing class errors during compilation for classes not explicitly requested.
 @RestController
 @RequestMapping("/v1/auth")
 public class AuthController {
@@ -31,8 +35,8 @@ public class AuthController {
     }
 
     @PostMapping("/register")
-    public ResponseEntity<Object> register(@RequestBody Object request) {
-        Object response = authService.register(request);
+    public ResponseEntity<RegistroResponse> register(@Valid @RequestBody RegistroRequest request) {
+        RegistroResponse response = authService.register(request);
         URI location = ServletUriComponentsBuilder
                 .fromCurrentContextPath()
                 .path("/api/v1/usuario/me")
@@ -42,22 +46,21 @@ public class AuthController {
     }
 
     @PostMapping("/login")
-    public ResponseEntity<Object> login(@RequestBody Object request, HttpServletResponse response) {
-        Object tokens = authService.login(request);
-        // Assuming TokenInternal equivalent returns access and refresh, we hardcode empty strings for compilation simulation.
-        addRefreshTokenCookie(response, "dummy-refresh-token", Duration.ofDays(7));
-        return ResponseEntity.ok(tokens);
+    public ResponseEntity<TokenResponse> login(@Valid @RequestBody LogueoRequest request, HttpServletResponse response) {
+        TokenInternal tokens = authService.login(request);
+        addRefreshTokenCookie(response, tokens.refreshToken(), Duration.ofDays(7));
+        return ResponseEntity.ok(new TokenResponse(tokens.accessToken()));
     }
 
     @PostMapping("/refresh")
-    public ResponseEntity<Object> refresh(HttpServletRequest request, HttpServletResponse response) {
+    public ResponseEntity<TokenResponse> refresh(HttpServletRequest request, HttpServletResponse response) {
         String refreshToken = extractRefreshTokenFromCookie(request);
         if (refreshToken == null) {
             throw new RuntimeException("Refresh token no encontrado");
         }
-        Object tokens = authService.refresh(refreshToken);
-        addRefreshTokenCookie(response, "dummy-refresh-token", Duration.ofDays(7));
-        return ResponseEntity.ok(tokens);
+        TokenInternal tokens = authService.refresh(refreshToken);
+        addRefreshTokenCookie(response, tokens.refreshToken(), Duration.ofDays(7));
+        return ResponseEntity.ok(new TokenResponse(tokens.accessToken()));
     }
 
     @PostMapping("/logout")
