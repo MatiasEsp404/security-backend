@@ -10,10 +10,17 @@ import com.matias.application.dto.request.RegistroRequest;
 import com.matias.web.dto.request.SolicitudResetPasswordRequest;
 import com.matias.application.dto.response.RegistroResponse;
 import com.matias.application.dto.response.TokenResponse;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseCookie;
@@ -25,6 +32,8 @@ import java.net.URI;
 import java.time.Duration;
 import java.util.Arrays;
 
+@Slf4j
+@Tag(name = "Autenticación", description = "Endpoints para registro, login, verificación de email y reseteo de contraseña.")
 @RestController
 @RequestMapping("/v1/auth")
 public class AuthController {
@@ -40,6 +49,12 @@ public class AuthController {
         this.passwordResetService = passwordResetService;
     }
 
+    @Operation(summary = "Registrar usuario", description = "Crea un usuario y envía un email para verificar la cuenta.")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "201", description = "Registro exitoso"),
+            @ApiResponse(responseCode = "400", description = "Datos inválidos", content = @Content),
+            @ApiResponse(responseCode = "409", description = "Email ya registrado", content = @Content)
+    })
     @PostMapping("/register")
     public ResponseEntity<RegistroResponse> register(@Valid @RequestBody RegistroRequest request) {
         RegistroResponse response = authService.register(request);
@@ -51,6 +66,12 @@ public class AuthController {
         return ResponseEntity.created(location).body(response);
     }
 
+    @Operation(summary = "Iniciar sesión", description = "Autentica al usuario y devuelve tokens JWT.")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Login exitoso"),
+            @ApiResponse(responseCode = "401", description = "Credenciales inválidas", content = @Content),
+            @ApiResponse(responseCode = "403", description = "Email no verificado", content = @Content)
+    })
     @PostMapping("/login")
     public ResponseEntity<TokenResponse> login(@Valid @RequestBody LogueoRequest request, HttpServletResponse response) {
         TokenInternal tokens = authService.login(request);
@@ -58,10 +79,19 @@ public class AuthController {
         return ResponseEntity.ok(new TokenResponse(tokens.accessToken()));
     }
 
+    @Operation(summary = "Refrescar tokens", description = "Genera un nuevo access token usando un refresh token válido.")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Tokens refrescados"),
+            @ApiResponse(responseCode = "401", description = "Refresh token inválido", content = @Content),
+            @ApiResponse(responseCode = "404", description = "Token no encontrado", content = @Content)
+    })
     @PostMapping("/refresh")
     public ResponseEntity<TokenResponse> refresh(HttpServletRequest request, HttpServletResponse response) {
         String refreshToken = extractRefreshTokenFromCookie(request);
         if (refreshToken == null) {
+            String ipOrigen = obtenerIpCliente(request);
+            log.warn("[SECURITY] Intento de refresh sin cookie de refresh token. IP: {}, User-Agent: {}",
+                    ipOrigen, request.getHeader("User-Agent"));
             throw new RuntimeException("Refresh token no encontrado");
         }
         TokenInternal tokens = authService.refresh(refreshToken);
@@ -69,22 +99,44 @@ public class AuthController {
         return ResponseEntity.ok(new TokenResponse(tokens.accessToken()));
     }
 
+    @Operation(summary = "Cerrar sesión", description = "Invalida el refresh token del usuario.")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "204", description = "Sesión cerrada"),
+            @ApiResponse(responseCode = "400", description = "Token inválido", content = @Content),
+            @ApiResponse(responseCode = "404", description = "Token no encontrado", content = @Content)
+    })
     @PostMapping("/logout")
     public ResponseEntity<Void> logout(HttpServletRequest request, HttpServletResponse response) {
         String refreshToken = extractRefreshTokenFromCookie(request);
         if (refreshToken != null) {
             authService.logout(refreshToken);
+        } else {
+            String ipOrigen = obtenerIpCliente(request);
+            log.debug("[SECURITY] Intento de logout sin cookie de refresh token. IP: {}", ipOrigen);
         }
         clearRefreshTokenCookie(response);
         return ResponseEntity.noContent().build();
     }
 
+    @Operation(summary = "Verificar email", description = "Confirma el email usando el token enviado por correo.")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "204", description = "Email verificado"),
+            @ApiResponse(responseCode = "400", description = "Token inválido o expirado", content = @Content),
+            @ApiResponse(responseCode = "404", description = "Token no encontrado", content = @Content)
+    })
     @GetMapping("/verificar-email")
-    public ResponseEntity<Void> verificarEmail(@RequestParam String token) {
+    public ResponseEntity<Void> verificarEmail(
+            @Parameter(description = "Token de verificación", required = true) @RequestParam String token) {
         authService.verificarEmail(token);
         return ResponseEntity.noContent().build();
     }
 
+    @Operation(summary = "Reenviar verificación", description = "Envía nuevamente el email de verificación.")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "204", description = "Email reenviado"),
+            @ApiResponse(responseCode = "400", description = "Email inválido o usuario ya verificado", content = @Content),
+            @ApiResponse(responseCode = "404", description = "Usuario no encontrado", content = @Content)
+    })
     @PostMapping("/reenviar-email-verificacion")
     public ResponseEntity<Void> reenviarEmailVerificacion(
             @Valid @RequestBody ReenvioEmailRequest request,
@@ -94,6 +146,12 @@ public class AuthController {
         return ResponseEntity.noContent().build();
     }
 
+    @Operation(summary = "Solicitar reseteo de contraseña", description = "Envía un email con un token para resetear la contraseña.")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "204", description = "Email enviado"),
+            @ApiResponse(responseCode = "400", description = "Email inválido o límite de solicitudes excedido", content = @Content),
+            @ApiResponse(responseCode = "404", description = "Usuario no encontrado", content = @Content)
+    })
     @PostMapping("/solicitar-reset-password")
     public ResponseEntity<Void> solicitarResetPassword(
             @Valid @RequestBody SolicitudResetPasswordRequest request,
@@ -103,12 +161,25 @@ public class AuthController {
         return ResponseEntity.noContent().build();
     }
 
+    @Operation(summary = "Validar token de reseteo", description = "Comprueba si el token de reseteo es válido.")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "204", description = "Token válido"),
+            @ApiResponse(responseCode = "400", description = "Token inválido o expirado", content = @Content),
+            @ApiResponse(responseCode = "404", description = "Token no encontrado", content = @Content)
+    })
     @GetMapping("/validar-token-reset")
-    public ResponseEntity<Void> validarTokenReset(@RequestParam String token) {
+    public ResponseEntity<Void> validarTokenReset(
+            @Parameter(description = "Token de reseteo", required = true) @RequestParam String token) {
         passwordResetService.validarToken(token);
         return ResponseEntity.noContent().build();
     }
 
+    @Operation(summary = "Confirmar reseteo de contraseña", description = "Actualiza la contraseña usando un token válido.")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "204", description = "Contraseña actualizada"),
+            @ApiResponse(responseCode = "400", description = "Token inválido, expirado o contraseña inválida", content = @Content),
+            @ApiResponse(responseCode = "404", description = "Token no encontrado", content = @Content)
+    })
     @PostMapping("/confirmar-reset-password")
     public ResponseEntity<Void> confirmarResetPassword(@Valid @RequestBody ConfirmarResetPasswordRequest request) {
         passwordResetService.resetearPassword(request.getToken(), request.getNuevaPassword());
@@ -151,10 +222,16 @@ public class AuthController {
     }
 
     private String obtenerIpCliente(HttpServletRequest request) {
-        String xForwardedFor = request.getHeader("X-Forwarded-For");
-        if (xForwardedFor != null && !xForwardedFor.isEmpty()) {
-            return xForwardedFor.split(",")[0].trim();
+        String ip = request.getHeader("X-Forwarded-For");
+        if (ip == null || ip.isEmpty() || "unknown".equalsIgnoreCase(ip)) {
+            ip = request.getHeader("X-Real-IP");
         }
-        return request.getRemoteAddr();
+        if (ip == null || ip.isEmpty() || "unknown".equalsIgnoreCase(ip)) {
+            ip = request.getRemoteAddr();
+        }
+        if (ip != null && ip.contains(",")) {
+            ip = ip.split(",")[0].trim();
+        }
+        return ip;
     }
 }
