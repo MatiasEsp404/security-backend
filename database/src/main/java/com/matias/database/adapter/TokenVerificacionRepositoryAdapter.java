@@ -9,7 +9,9 @@ import com.matias.domain.model.EstadoTokenVerificacion;
 import com.matias.domain.model.TokenVerificacion;
 import com.matias.domain.port.TokenVerificacionRepositoryPort;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
 import java.util.Optional;
 
 @Component
@@ -58,5 +60,17 @@ public class TokenVerificacionRepositoryAdapter implements TokenVerificacionRepo
     @Override
     public void deleteById(Integer id) {
         jpaRepository.deleteById(id);
+    }
+
+    @Override
+    @Transactional
+    public int deleteByExpiracionBeforeAndEstado(Instant expiracion, EstadoTokenVerificacion estado) {
+        return jpaRepository.deleteByExpiracionBeforeAndEstado(expiracion, estado);
+    }
+
+    @Override
+    @Transactional
+    public int updateEstadoByUsuarioIdAndEstado(Integer usuarioId, EstadoTokenVerificacion estadoActual, EstadoTokenVerificacion nuevoEstado) {
+        return jpaRepository.updateEstadoByUsuarioIdAndEstado(usuarioId, estadoActual, nuevoEstado);
     }
 }

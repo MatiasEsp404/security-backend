@@ -2,10 +2,13 @@ package com.matias.application.service.impl;
 
 import com.matias.application.dto.internal.TokenInternal;
 import com.matias.application.dto.request.LogueoRequest;
+import com.matias.application.dto.request.ReenvioEmailRequest;
 import com.matias.application.dto.request.RegistroRequest;
 import com.matias.application.dto.response.RegistroResponse;
 import com.matias.application.email.VerificationEmailTemplate;
 import com.matias.application.service.AuthService;
+import com.matias.application.service.PasswordResetService;
+import com.matias.application.service.VerificacionEmailService;
 import com.matias.domain.exception.AccesoDenegadoException;
 import com.matias.domain.exception.ConflictoException;
 import com.matias.domain.exception.NoAutenticadoException;
@@ -37,6 +40,8 @@ public class AuthServiceImpl implements AuthService {
     private final PasswordEncoder passwordEncoder;
     private final TokenVerificacionRepositoryPort tokenVerificacionRepository;
     private final EmailServicePort emailService;
+    private final VerificacionEmailService verificacionEmailService;
+    private final PasswordResetService passwordResetService;
 
     @Value("${app.back-url}")
     private String backUrl;
@@ -51,12 +56,16 @@ public class AuthServiceImpl implements AuthService {
                           TokenServicePort tokenService,
                           PasswordEncoder passwordEncoder,
                           TokenVerificacionRepositoryPort tokenVerificacionRepository,
-                          EmailServicePort emailService) {
+                          EmailServicePort emailService,
+                          VerificacionEmailService verificacionEmailService,
+                          PasswordResetService passwordResetService) {
         this.usuarioRepository = usuarioRepository;
         this.tokenService = tokenService;
         this.passwordEncoder = passwordEncoder;
         this.tokenVerificacionRepository = tokenVerificacionRepository;
         this.emailService = emailService;
+        this.verificacionEmailService = verificacionEmailService;
+        this.passwordResetService = passwordResetService;
     }
 
     @Override
@@ -216,30 +225,52 @@ public class AuthServiceImpl implements AuthService {
     }
 
     @Override
-    public void reenviarEmailVerificacion(Object request, String ipOrigen) {
-        log.info("Reenviando email de verificación desde IP: {}", ipOrigen);
-        // TODO: Implementar lógica de reenvío de email
-        throw new UnsupportedOperationException("Funcionalidad no implementada aún");
+    public void reenviarEmailVerificacion(ReenvioEmailRequest request, String ipOrigen) {
+        log.info("Reenviando email de verificación para email: {} desde IP: {}", request.email(), ipOrigen);
+        
+        // Buscar usuario por email
+        Usuario usuario = usuarioRepository.findByEmail(request.email())
+                .orElseThrow(() -> new RecursoNoEncontradoException("Usuario no encontrado"));
+
+        // Validar que el usuario puede recibir un reenvío (lógica anti-abuso)
+        verificacionEmailService.validarReenvio(usuario, ipOrigen);
+
+        // Generar nuevo token de verificación
+        String token = verificacionEmailService.generarTokenVerificacion(usuario);
+        
+        log.info("Nuevo token de verificación generado para usuario: {}", usuario.getEmail());
+
+        // Enviar email de verificación
+        try {
+            VerificationEmailTemplate emailTemplate = new VerificationEmailTemplate(
+                    usuario.getEmail(),
+                    usuario.getNombre(),
+                    token,
+                    frontUrl,
+                    tokenExpirationHours + " horas"
+            );
+            emailService.send(emailTemplate);
+            log.info("Email de verificación reenviado a: {}", usuario.getEmail());
+        } catch (Exception e) {
+            log.error("Error al reenviar email de verificación: {}", e.getMessage(), e);
+            throw new OperacionNoPermitidaException("No se pudo enviar el email de verificación. Intente más tarde");
+        }
     }
 
     @Override
-    public void solicitarReseteoPassword(Object request, String ipOrigen) {
-        log.info("Solicitando reseteo de password desde IP: {}", ipOrigen);
-        // TODO: Implementar lógica de solicitud de reseteo
-        throw new UnsupportedOperationException("Funcionalidad no implementada aún");
-    }
+    public void solicitarResetPassword(String email, String ipOrigen) {
+        log.info("Solicitando reseteo de password para email: {} desde IP: {}", email, ipOrigen);
+        
+        // Validar la solicitud de reset (anti-abuso)
+        passwordResetService.validarSolicitudReset(email, ipOrigen);
+        
+        // Buscar usuario por email
+        Usuario usuario = usuarioRepository.findByEmail(email)
+                .orElseThrow(() -> new RecursoNoEncontradoException("Usuario no encontrado"));
 
-    @Override
-    public void validarTokenReset(String token) {
-        log.info("Validando token de reset");
-        // TODO: Implementar lógica de validación de token
-        throw new UnsupportedOperationException("Funcionalidad no implementada aún");
-    }
-
-    @Override
-    public void resetearPassword(Object request) {
-        log.info("Reseteando password");
-        // TODO: Implementar lógica de reseteo de password
-        throw new UnsupportedOperationException("Funcionalidad no implementada aún");
+        // Generar token de reset y enviar email
+        passwordResetService.generarTokenReset(usuario);
+        
+        log.info("Solicitud de reseteo de password completada para email: {}", email);
     }
 }

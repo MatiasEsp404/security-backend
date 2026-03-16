@@ -1,9 +1,13 @@
 package com.matias.web.controller;
 
 import com.matias.application.service.AuthService;
+import com.matias.application.service.PasswordResetService;
 import com.matias.application.dto.internal.TokenInternal;
+import com.matias.web.dto.request.ConfirmarResetPasswordRequest;
 import com.matias.application.dto.request.LogueoRequest;
+import com.matias.application.dto.request.ReenvioEmailRequest;
 import com.matias.application.dto.request.RegistroRequest;
+import com.matias.web.dto.request.SolicitudResetPasswordRequest;
 import com.matias.application.dto.response.RegistroResponse;
 import com.matias.application.dto.response.TokenResponse;
 import jakarta.servlet.http.Cookie;
@@ -29,9 +33,11 @@ public class AuthController {
     private String environment;
 
     private final AuthService authService;
+    private final PasswordResetService passwordResetService;
 
-    public AuthController(AuthService authService) {
+    public AuthController(AuthService authService, PasswordResetService passwordResetService) {
         this.authService = authService;
+        this.passwordResetService = passwordResetService;
     }
 
     @PostMapping("/register")
@@ -79,6 +85,36 @@ public class AuthController {
         return ResponseEntity.noContent().build();
     }
 
+    @PostMapping("/reenviar-email-verificacion")
+    public ResponseEntity<Void> reenviarEmailVerificacion(
+            @Valid @RequestBody ReenvioEmailRequest request,
+            HttpServletRequest httpServletRequest) {
+        String ipOrigen = obtenerIpCliente(httpServletRequest);
+        authService.reenviarEmailVerificacion(request, ipOrigen);
+        return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/solicitar-reset-password")
+    public ResponseEntity<Void> solicitarResetPassword(
+            @Valid @RequestBody SolicitudResetPasswordRequest request,
+            HttpServletRequest httpServletRequest) {
+        String ipOrigen = obtenerIpCliente(httpServletRequest);
+        authService.solicitarResetPassword(request.getEmail(), ipOrigen);
+        return ResponseEntity.noContent().build();
+    }
+
+    @GetMapping("/validar-token-reset")
+    public ResponseEntity<Void> validarTokenReset(@RequestParam String token) {
+        passwordResetService.validarToken(token);
+        return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/confirmar-reset-password")
+    public ResponseEntity<Void> confirmarResetPassword(@Valid @RequestBody ConfirmarResetPasswordRequest request) {
+        passwordResetService.resetearPassword(request.getToken(), request.getNuevaPassword());
+        return ResponseEntity.noContent().build();
+    }
+
     private boolean isProduction() {
         return "prod".equals(environment);
     }
@@ -112,5 +148,13 @@ public class AuthController {
     private void clearRefreshTokenCookie(HttpServletResponse response) {
         ResponseCookie cookie = buildRefreshTokenCookie("", Duration.ZERO);
         response.addHeader(HttpHeaders.SET_COOKIE, cookie.toString());
+    }
+
+    private String obtenerIpCliente(HttpServletRequest request) {
+        String xForwardedFor = request.getHeader("X-Forwarded-For");
+        if (xForwardedFor != null && !xForwardedFor.isEmpty()) {
+            return xForwardedFor.split(",")[0].trim();
+        }
+        return request.getRemoteAddr();
     }
 }
