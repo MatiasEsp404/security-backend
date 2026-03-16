@@ -273,4 +273,21 @@ public class AuthServiceImpl implements AuthService {
         
         log.info("Solicitud de reseteo de password completada para email: {}", email);
     }
+
+    @Override
+    public void limpiarDatosObsoletos() {
+        log.info("Iniciando limpieza de datos obsoletos");
+        
+        Instant ahora = Instant.now();
+        
+        // Limpieza de datos de verificación de email
+        int eliminadosVerificacion = verificacionEmailService.limpiarDatosObsoletos();
+        log.info("Limpieza de datos de verificación: {} registros eliminados", eliminadosVerificacion);
+        
+        // Limpieza de datos de reseteo de password
+        int eliminadosReset = passwordResetService.limpiarDatosObsoletos();
+        log.info("Limpieza de datos de reseteo: {} registros eliminados", eliminadosReset);
+        
+        log.info("Limpieza de datos obsoletos completada");
+    }
 }

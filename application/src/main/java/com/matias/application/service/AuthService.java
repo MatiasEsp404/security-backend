@@ -14,4 +14,5 @@ public interface AuthService {
     void verificarEmail(String token);
     void reenviarEmailVerificacion(ReenvioEmailRequest request, String ipOrigen);
     void solicitarResetPassword(String email, String ipOrigen);
+    void limpiarDatosObsoletos();
 }
