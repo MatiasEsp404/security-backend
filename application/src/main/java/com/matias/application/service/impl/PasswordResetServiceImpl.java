@@ -2,6 +2,8 @@ package com.matias.application.service.impl;
 
 import com.matias.application.email.PasswordResetEmailTemplate;
 import com.matias.application.service.PasswordResetService;
+import com.matias.domain.exception.OperacionNoPermitidaException;
+import com.matias.domain.exception.RecursoNoEncontradoException;
 import com.matias.domain.model.*;
 import com.matias.domain.port.EmailServicePort;
 import com.matias.domain.port.PasswordResetIntentoRepositoryPort;
@@ -63,7 +65,7 @@ public class PasswordResetServiceImpl implements PasswordResetService {
 
         // Validación del token: existencia, estado y expiración
         TokenPasswordReset tokenEntity = tokenPasswordResetRepositoryPort.findByToken(token)
-                .orElseThrow(() -> new IllegalStateException("Token de reseteo no encontrado"));
+                .orElseThrow(() -> new OperacionNoPermitidaException("Token de reseteo no encontrado"));
 
         // Validación del token: estado
         if (tokenEntity.getEstado() != EstadoTokenVerificacion.PENDIENTE) {
@@ -72,14 +74,14 @@ public class PasswordResetServiceImpl implements PasswordResetService {
                 case EXPIRADO -> "El token ha expirado. Solicita un nuevo enlace de recuperación";
                 default -> "El token no es válido";
             };
-            throw new IllegalStateException(mensaje);
+            throw new OperacionNoPermitidaException(mensaje);
         }
 
         // Validación del token: expiración
         if (tokenEntity.estaExpirado()) {
             tokenEntity.marcarComoExpirado();
             tokenPasswordResetRepositoryPort.save(tokenEntity);
-            throw new IllegalStateException(
+            throw new OperacionNoPermitidaException(
                     "El token ha expirado. Solicita un nuevo enlace de recuperación");
         }
 
@@ -99,14 +101,14 @@ public class PasswordResetServiceImpl implements PasswordResetService {
     @Transactional(readOnly = true)
     public void validarToken(String token) {
         TokenPasswordReset tokenEntity = tokenPasswordResetRepositoryPort.findByToken(token)
-                .orElseThrow(() -> new IllegalStateException("Token de reseteo no encontrado"));
+                .orElseThrow(() -> new OperacionNoPermitidaException("Token de reseteo no encontrado"));
 
         if (tokenEntity.getEstado() != EstadoTokenVerificacion.PENDIENTE) {
-            throw new IllegalStateException("El token no es válido");
+            throw new OperacionNoPermitidaException("El token no es válido");
         }
 
         if (tokenEntity.estaExpirado()) {
-            throw new IllegalStateException("El token ha expirado");
+            throw new OperacionNoPermitidaException("El token ha expirado");
         }
     }
 
@@ -114,14 +116,14 @@ public class PasswordResetServiceImpl implements PasswordResetService {
     @Transactional
     public void validarSolicitudReset(String email, String ipOrigen) {
         Usuario usuario = usuarioRepositoryPort.findByEmail(email)
-                .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado"));
+                .orElseThrow(() -> new RecursoNoEncontradoException("Usuario no encontrado"));
 
         // Lógica anti-abuso: Tiempo mínimo entre solicitudes
         intentoRepositoryPort.findUltimoIntentoByUsuario(usuario).ifPresent(ultimoIntento -> {
             Instant proximaSolicitudPermitida = ultimoIntento.getFechaIntento().plus(TIEMPO_ENTRE_SOLICITUDES);
             if (Instant.now().isBefore(proximaSolicitudPermitida)) {
                 long segundosRestantes = Duration.between(Instant.now(), proximaSolicitudPermitida).getSeconds();
-                throw new IllegalStateException(
+                throw new OperacionNoPermitidaException(
                         String.format("Debes esperar %d segundos antes de solicitar otro reseteo", segundosRestantes));
             }
         });
@@ -131,7 +133,7 @@ public class PasswordResetServiceImpl implements PasswordResetService {
         long intentosHoy = intentoRepositoryPort.countByUsuarioAndFechaIntentoAfter(usuario, inicioDelDia);
 
         if (intentosHoy >= MAX_INTENTOS_DIARIOS) {
-            throw new IllegalStateException(
+            throw new OperacionNoPermitidaException(
                     "Has excedido el límite de " + MAX_INTENTOS_DIARIOS + " solicitudes por día. Intenta mañana");
         }
 
