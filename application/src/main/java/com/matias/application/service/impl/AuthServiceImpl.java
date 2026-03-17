@@ -18,6 +18,7 @@ import com.matias.domain.model.Rol;
 import com.matias.domain.model.TokenVerificacion;
 import com.matias.domain.model.Usuario;
 import com.matias.domain.port.EmailServicePort;
+import com.matias.domain.port.TokenInvalidoRepositoryPort;
 import com.matias.domain.port.TokenServicePort;
 import com.matias.domain.port.TokenVerificacionRepositoryPort;
 import com.matias.domain.port.UsuarioRepositoryPort;
@@ -42,6 +43,7 @@ public class AuthServiceImpl implements AuthService {
     private final EmailServicePort emailService;
     private final VerificacionEmailService verificacionEmailService;
     private final PasswordResetService passwordResetService;
+    private final TokenInvalidoRepositoryPort tokenInvalidoRepository;
 
     @Value("${app.back-url}")
     private String backUrl;
@@ -58,7 +60,8 @@ public class AuthServiceImpl implements AuthService {
                           TokenVerificacionRepositoryPort tokenVerificacionRepository,
                           EmailServicePort emailService,
                           VerificacionEmailService verificacionEmailService,
-                          PasswordResetService passwordResetService) {
+                          PasswordResetService passwordResetService,
+                          TokenInvalidoRepositoryPort tokenInvalidoRepository) {
         this.usuarioRepository = usuarioRepository;
         this.tokenService = tokenService;
         this.passwordEncoder = passwordEncoder;
@@ -66,6 +69,7 @@ public class AuthServiceImpl implements AuthService {
         this.emailService = emailService;
         this.verificacionEmailService = verificacionEmailService;
         this.passwordResetService = passwordResetService;
+        this.tokenInvalidoRepository = tokenInvalidoRepository;
     }
 
     @Override
@@ -74,7 +78,7 @@ public class AuthServiceImpl implements AuthService {
         
         // Verificar si el usuario ya existe
         if (usuarioRepository.findByEmail(request.email()).isPresent()) {
-            throw new ConflictoException("El email ya está registrado");
+            throw new ConflictoException("El email ya estรก registrado");
         }
 
         // Crear usuario
@@ -94,16 +98,16 @@ public class AuthServiceImpl implements AuthService {
         
         log.info("Usuario registrado exitosamente con ID: {}", usuarioGuardado.getId());
 
-        // Generar token de verificación
+        // Generar token de verificaciรณn
         String token = UUID.randomUUID().toString();
         Instant expiracion = Instant.now().plus(tokenExpirationHours, ChronoUnit.HOURS);
         
         TokenVerificacion tokenVerificacion = new TokenVerificacion(token, expiracion, usuarioGuardado.getId());
         tokenVerificacionRepository.save(tokenVerificacion);
         
-        log.info("Token de verificación generado para usuario ID: {}", usuarioGuardado.getId());
+        log.info("Token de verificaciรณn generado para usuario ID: {}", usuarioGuardado.getId());
 
-        // Enviar email de verificación
+        // Enviar email de verificaciรณn
         try {
             VerificationEmailTemplate emailTemplate = new VerificationEmailTemplate(
                     usuarioGuardado.getEmail(),
@@ -113,9 +117,9 @@ public class AuthServiceImpl implements AuthService {
                     tokenExpirationHours + " horas"
             );
             emailService.send(emailTemplate);
-            log.info("Email de verificación enviado a: {}", usuarioGuardado.getEmail());
+            log.info("Email de verificaciรณn enviado a: {}", usuarioGuardado.getEmail());
         } catch (Exception e) {
-            log.error("Error al enviar email de verificación: {}", e.getMessage(), e);
+            log.error("Error al enviar email de verificaciรณn: {}", e.getMessage(), e);
             // No fallar el registro si el email no se puede enviar
         }
         
@@ -131,14 +135,14 @@ public class AuthServiceImpl implements AuthService {
         
         // Buscar usuario
         Usuario usuario = usuarioRepository.findByEmail(request.email())
-                .orElseThrow(() -> new NoAutenticadoException("Credenciales inválidas"));
+                .orElseThrow(() -> new NoAutenticadoException("Credenciales invรกlidas"));
 
-        // Verificar contraseña
+        // Verificar contraseรฑa
         if (!passwordEncoder.matches(request.password(), usuario.getPassword())) {
-            throw new NoAutenticadoException("Credenciales inválidas");
+            throw new NoAutenticadoException("Credenciales invรกlidas");
         }
 
-        // Verificar si el usuario está activo
+        // Verificar si el usuario estรก activo
         if (!usuario.getActivo()) {
             throw new AccesoDenegadoException("Usuario inactivo. Contacte al administrador");
         }
@@ -160,7 +164,7 @@ public class AuthServiceImpl implements AuthService {
         
         // Validar que es un refresh token
         if (!tokenService.esRefreshToken(refreshToken)) {
-            throw new NoAutenticadoException("Token inválido: no es un refresh token");
+            throw new NoAutenticadoException("Token invรกlido: no es un refresh token");
         }
         
         // Obtener email del token
@@ -182,8 +186,27 @@ public class AuthServiceImpl implements AuthService {
     @Override
     public void logout(String refreshToken) {
         log.info("Intento de logout");
-        // TODO: Implementar lógica de logout (blacklist de tokens, etc.)
-        log.info("Logout procesado");
+        
+        // Validar que es un refresh token
+        if (!tokenService.esRefreshToken(refreshToken)) {
+            throw new NoAutenticadoException("Token inválido: no es un refresh token");
+        }
+        
+        // Obtener email del token
+        String email = tokenService.extractEmail(refreshToken);
+        
+        // Buscar usuario
+        Usuario usuario = usuarioRepository.findByEmail(email)
+                .orElseThrow(() -> new RecursoNoEncontradoException("Usuario no encontrado"));
+        
+        // Invalidar el refresh token
+        tokenService.invalidarToken(
+            refreshToken, 
+            com.matias.domain.model.MotivoInvalidacionToken.LOGOUT, 
+            usuario.getId()
+        );
+        
+        log.info("Logout procesado exitosamente para usuario: {}", email);
     }
 
     @Override
@@ -192,7 +215,7 @@ public class AuthServiceImpl implements AuthService {
         
         // Buscar token
         TokenVerificacion tokenVerificacion = tokenVerificacionRepository.findByToken(token)
-                .orElseThrow(() -> new RecursoNoEncontradoException("Token de verificación no encontrado"));
+                .orElseThrow(() -> new RecursoNoEncontradoException("Token de verificaciรณn no encontrado"));
 
         // Validar token
         if (tokenVerificacion.estaExpirado()) {
@@ -206,7 +229,7 @@ public class AuthServiceImpl implements AuthService {
         }
 
         if (!tokenVerificacion.esValido()) {
-            throw new OperacionNoPermitidaException("El token no es válido");
+            throw new OperacionNoPermitidaException("El token no es vรกlido");
         }
 
         // Buscar usuario
@@ -226,21 +249,21 @@ public class AuthServiceImpl implements AuthService {
 
     @Override
     public void reenviarEmailVerificacion(ReenvioEmailRequest request, String ipOrigen) {
-        log.info("Reenviando email de verificación para email: {} desde IP: {}", request.email(), ipOrigen);
+        log.info("Reenviando email de verificaciรณn para email: {} desde IP: {}", request.email(), ipOrigen);
         
         // Buscar usuario por email
         Usuario usuario = usuarioRepository.findByEmail(request.email())
                 .orElseThrow(() -> new RecursoNoEncontradoException("Usuario no encontrado"));
 
-        // Validar que el usuario puede recibir un reenvío (lógica anti-abuso)
+        // Validar que el usuario puede recibir un reenvรญo (lรณgica anti-abuso)
         verificacionEmailService.validarReenvio(usuario, ipOrigen);
 
-        // Generar nuevo token de verificación
+        // Generar nuevo token de verificaciรณn
         String token = verificacionEmailService.generarTokenVerificacion(usuario);
         
-        log.info("Nuevo token de verificación generado para usuario: {}", usuario.getEmail());
+        log.info("Nuevo token de verificaciรณn generado para usuario: {}", usuario.getEmail());
 
-        // Enviar email de verificación
+        // Enviar email de verificaciรณn
         try {
             VerificationEmailTemplate emailTemplate = new VerificationEmailTemplate(
                     usuario.getEmail(),
@@ -250,11 +273,36 @@ public class AuthServiceImpl implements AuthService {
                     tokenExpirationHours + " horas"
             );
             emailService.send(emailTemplate);
-            log.info("Email de verificación reenviado a: {}", usuario.getEmail());
+            log.info("Email de verificaciรณn reenviado a: {}", usuario.getEmail());
         } catch (Exception e) {
-            log.error("Error al reenviar email de verificación: {}", e.getMessage(), e);
-            throw new OperacionNoPermitidaException("No se pudo enviar el email de verificación. Intente más tarde");
+            log.error("Error al reenviar email de verificaciรณn: {}", e.getMessage(), e);
+            throw new OperacionNoPermitidaException("No se pudo enviar el email de verificaciรณn. Intente mรกs tarde");
         }
+    }
+
+    @Override
+    public void limpiarDatosObsoletos() {
+        log.info("Iniciando limpieza de datos obsoletos");
+        
+        Instant ahora = Instant.now();
+        
+        // Limpieza de datos de verificación de email
+        int eliminadosVerificacion = verificacionEmailService.limpiarDatosObsoletos();
+        log.info("Limpieza de datos de verificación: {} registros eliminados", eliminadosVerificacion);
+        
+        // Limpieza de datos de reseteo de password
+        int eliminadosReset = passwordResetService.limpiarDatosObsoletos();
+        log.info("Limpieza de datos de reseteo: {} registros eliminados", eliminadosReset);
+        
+        // Limpieza de tokens invalidados expirados
+        try {
+            tokenInvalidoRepository.eliminarTokensExpirados(ahora);
+            log.info("Limpieza de tokens invalidados expirados completada");
+        } catch (Exception e) {
+            log.error("Error al limpiar tokens invalidados: {}", e.getMessage(), e);
+        }
+        
+        log.info("Limpieza de datos obsoletos completada");
     }
 
     @Override
@@ -272,22 +320,5 @@ public class AuthServiceImpl implements AuthService {
         passwordResetService.generarTokenReset(usuario);
         
         log.info("Solicitud de reseteo de password completada para email: {}", email);
-    }
-
-    @Override
-    public void limpiarDatosObsoletos() {
-        log.info("Iniciando limpieza de datos obsoletos");
-        
-        Instant ahora = Instant.now();
-        
-        // Limpieza de datos de verificación de email
-        int eliminadosVerificacion = verificacionEmailService.limpiarDatosObsoletos();
-        log.info("Limpieza de datos de verificación: {} registros eliminados", eliminadosVerificacion);
-        
-        // Limpieza de datos de reseteo de password
-        int eliminadosReset = passwordResetService.limpiarDatosObsoletos();
-        log.info("Limpieza de datos de reseteo: {} registros eliminados", eliminadosReset);
-        
-        log.info("Limpieza de datos obsoletos completada");
     }
 }

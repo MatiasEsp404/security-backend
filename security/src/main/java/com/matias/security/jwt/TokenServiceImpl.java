@@ -1,6 +1,9 @@
 package com.matias.security.jwt;
 
+import com.matias.domain.model.MotivoInvalidacionToken;
 import com.matias.domain.model.Rol;
+import com.matias.domain.model.TokenInvalido;
+import com.matias.domain.port.TokenInvalidoRepositoryPort;
 import com.matias.domain.port.TokenServicePort;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
@@ -20,6 +23,7 @@ import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.Base64;
 import java.util.Date;
+import java.util.HexFormat;
 import java.util.List;
 import java.util.Set;
 import java.util.function.Function;
@@ -27,6 +31,8 @@ import java.util.function.Function;
 @Slf4j
 @Service
 public class TokenServiceImpl implements TokenServicePort {
+    
+    private final TokenInvalidoRepositoryPort tokenInvalidoRepository;
 
     @Value("${jwt.secret}")
     private String secretKey;
@@ -38,6 +44,10 @@ public class TokenServiceImpl implements TokenServicePort {
     @DurationUnit(ChronoUnit.MILLIS)
     @Value("${jwt.refresh-token.expiration}")
     private Duration refreshExpiration;
+    
+    public TokenServiceImpl(TokenInvalidoRepositoryPort tokenInvalidoRepository) {
+        this.tokenInvalidoRepository = tokenInvalidoRepository;
+    }
 
     @PostConstruct
     public void validateSecretKey() {
@@ -65,10 +75,11 @@ public class TokenServiceImpl implements TokenServicePort {
             return false;
         }
 
-        // TODO: Implementar verificación de tokens invalidados cuando se agregue el repositorio
-        // Para ello se necesitará inyectar TokenInvalidoRepository y verificar:
-        // 1. Que el access token no esté invalidado explícitamente
-        // 2. Que el refresh token asociado (vía sid) no esté invalidado
+        // Verificar si el token está invalidado
+        if (esTokenInvalidado(token)) {
+            log.debug("Token invalidado detectado para usuario: {}", email);
+            return false;
+        }
 
         return true;
     }
@@ -149,5 +160,45 @@ public class TokenServiceImpl implements TokenServicePort {
         long duracionToken = expiration.getTime() - issuedAt.getTime();
         long margen = 5000;
         return Math.abs(duracionToken - refreshExpiration.toMillis()) < margen;
+    }
+    
+    @Override
+    public void invalidarToken(String token, MotivoInvalidacionToken motivo, Integer usuarioId) {
+        String tokenHash = calcularHashToken(token);
+        Instant expiracion = extractExpiration(token);
+        Instant fechaInvalidacion = Instant.now();
+        
+        TokenInvalido tokenInvalido = new TokenInvalido(
+            tokenHash,
+            expiracion,
+            fechaInvalidacion,
+            motivo,
+            usuarioId
+        );
+        
+        tokenInvalidoRepository.invalidar(tokenInvalido);
+        log.info("Token invalidado - Usuario: {}, Motivo: {}", usuarioId, motivo);
+    }
+    
+    @Override
+    public boolean esTokenInvalidado(String token) {
+        String tokenHash = calcularHashToken(token);
+        return tokenInvalidoRepository.existeTokenInvalido(tokenHash);
+    }
+    
+    /**
+     * Calcula el hash SHA-256 de un token para búsqueda eficiente.
+     *
+     * @param token token JWT completo
+     * @return hash SHA-256 en formato hexadecimal
+     */
+    private String calcularHashToken(String token) {
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            byte[] hash = digest.digest(token.getBytes(StandardCharsets.UTF_8));
+            return HexFormat.of().formatHex(hash);
+        } catch (NoSuchAlgorithmException e) {
+            throw new RuntimeException("Error al calcular hash SHA-256 del token", e);
+        }
     }
 }
