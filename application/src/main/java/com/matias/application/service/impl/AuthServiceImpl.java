@@ -22,6 +22,7 @@ import com.matias.domain.port.TokenInvalidoRepositoryPort;
 import com.matias.domain.port.TokenServicePort;
 import com.matias.domain.port.TokenVerificacionRepositoryPort;
 import com.matias.domain.port.UsuarioRepositoryPort;
+import com.matias.domain.util.DataNormalizer;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -76,17 +77,22 @@ public class AuthServiceImpl implements AuthService {
     public RegistroResponse register(RegistroRequest request) {
         log.info("Iniciando registro de usuario con email: {}", request.email());
         
+        // Normalizar datos de entrada
+        String emailNormalizado = DataNormalizer.normalizeEmail(request.email());
+        String nombreNormalizado = DataNormalizer.normalizeProperName(request.nombre());
+        String apellidoNormalizado = DataNormalizer.normalizeLastName(request.apellido());
+        
         // Verificar si el usuario ya existe
-        if (usuarioRepository.findByEmail(request.email()).isPresent()) {
-            throw new ConflictoException("El email ya estรก registrado");
+        if (usuarioRepository.findByEmail(emailNormalizado).isPresent()) {
+            throw new ConflictoException("El email ya está registrado");
         }
 
         // Crear usuario
         Usuario usuario = Usuario.builder()
-                .email(request.email())
+                .email(emailNormalizado)
                 .password(passwordEncoder.encode(request.password()))
-                .nombre(request.nombre())
-                .apellido(request.apellido())
+                .nombre(nombreNormalizado)
+                .apellido(apellidoNormalizado)
                 .fechaCreacion(Instant.now())
                 .activo(true)
                 .emailVerificado(false)
@@ -98,16 +104,16 @@ public class AuthServiceImpl implements AuthService {
         
         log.info("Usuario registrado exitosamente con ID: {}", usuarioGuardado.getId());
 
-        // Generar token de verificaciรณn
+        // Generar token de verificación
         String token = UUID.randomUUID().toString();
         Instant expiracion = Instant.now().plus(tokenExpirationHours, ChronoUnit.HOURS);
         
         TokenVerificacion tokenVerificacion = new TokenVerificacion(token, expiracion, usuarioGuardado.getId());
         tokenVerificacionRepository.save(tokenVerificacion);
         
-        log.info("Token de verificaciรณn generado para usuario ID: {}", usuarioGuardado.getId());
+        log.info("Token de verificación generado para usuario ID: {}", usuarioGuardado.getId());
 
-        // Enviar email de verificaciรณn
+        // Enviar email de verificación
         try {
             VerificationEmailTemplate emailTemplate = new VerificationEmailTemplate(
                     usuarioGuardado.getEmail(),
@@ -117,9 +123,9 @@ public class AuthServiceImpl implements AuthService {
                     tokenExpirationHours + " horas"
             );
             emailService.send(emailTemplate);
-            log.info("Email de verificaciรณn enviado a: {}", usuarioGuardado.getEmail());
+            log.info("Email de verificación enviado a: {}", usuarioGuardado.getEmail());
         } catch (Exception e) {
-            log.error("Error al enviar email de verificaciรณn: {}", e.getMessage(), e);
+            log.error("Error al enviar email de verificación: {}", e.getMessage(), e);
             // No fallar el registro si el email no se puede enviar
         }
         
@@ -133,16 +139,19 @@ public class AuthServiceImpl implements AuthService {
     public TokenInternal login(LogueoRequest request) {
         log.info("Intento de login para email: {}", request.email());
         
+        // Normalizar email para búsqueda
+        String emailNormalizado = DataNormalizer.normalizeEmail(request.email());
+        
         // Buscar usuario
-        Usuario usuario = usuarioRepository.findByEmail(request.email())
-                .orElseThrow(() -> new NoAutenticadoException("Credenciales invรกlidas"));
+        Usuario usuario = usuarioRepository.findByEmail(emailNormalizado)
+                .orElseThrow(() -> new NoAutenticadoException("Credenciales inválidas"));
 
-        // Verificar contraseรฑa
+        // Verificar contraseña
         if (!passwordEncoder.matches(request.password(), usuario.getPassword())) {
-            throw new NoAutenticadoException("Credenciales invรกlidas");
+            throw new NoAutenticadoException("Credenciales inválidas");
         }
 
-        // Verificar si el usuario estรก activo
+        // Verificar si el usuario está activo
         if (!usuario.getActivo()) {
             throw new AccesoDenegadoException("Usuario inactivo. Contacte al administrador");
         }
@@ -164,7 +173,7 @@ public class AuthServiceImpl implements AuthService {
         
         // Validar que es un refresh token
         if (!tokenService.esRefreshToken(refreshToken)) {
-            throw new NoAutenticadoException("Token invรกlido: no es un refresh token");
+            throw new NoAutenticadoException("Token inválido: no es un refresh token");
         }
         
         // Obtener email del token
@@ -215,7 +224,7 @@ public class AuthServiceImpl implements AuthService {
         
         // Buscar token
         TokenVerificacion tokenVerificacion = tokenVerificacionRepository.findByToken(token)
-                .orElseThrow(() -> new RecursoNoEncontradoException("Token de verificaciรณn no encontrado"));
+                .orElseThrow(() -> new RecursoNoEncontradoException("Token de verificación no encontrado"));
 
         // Validar token
         if (tokenVerificacion.estaExpirado()) {
@@ -229,7 +238,7 @@ public class AuthServiceImpl implements AuthService {
         }
 
         if (!tokenVerificacion.esValido()) {
-            throw new OperacionNoPermitidaException("El token no es vรกlido");
+            throw new OperacionNoPermitidaException("El token no es válido");
         }
 
         // Buscar usuario
@@ -249,21 +258,24 @@ public class AuthServiceImpl implements AuthService {
 
     @Override
     public void reenviarEmailVerificacion(ReenvioEmailRequest request, String ipOrigen) {
-        log.info("Reenviando email de verificaciรณn para email: {} desde IP: {}", request.email(), ipOrigen);
+        log.info("Reenviando email de verificación para email: {} desde IP: {}", request.email(), ipOrigen);
+        
+        // Normalizar email para búsqueda
+        String emailNormalizado = DataNormalizer.normalizeEmail(request.email());
         
         // Buscar usuario por email
-        Usuario usuario = usuarioRepository.findByEmail(request.email())
+        Usuario usuario = usuarioRepository.findByEmail(emailNormalizado)
                 .orElseThrow(() -> new RecursoNoEncontradoException("Usuario no encontrado"));
 
-        // Validar que el usuario puede recibir un reenvรญo (lรณgica anti-abuso)
+        // Validar que el usuario puede recibir un reenvío (lógica anti-abuso)
         verificacionEmailService.validarReenvio(usuario, ipOrigen);
 
-        // Generar nuevo token de verificaciรณn
+        // Generar nuevo token de verificación
         String token = verificacionEmailService.generarTokenVerificacion(usuario);
         
-        log.info("Nuevo token de verificaciรณn generado para usuario: {}", usuario.getEmail());
+        log.info("Nuevo token de verificación generado para usuario: {}", usuario.getEmail());
 
-        // Enviar email de verificaciรณn
+        // Enviar email de verificación
         try {
             VerificationEmailTemplate emailTemplate = new VerificationEmailTemplate(
                     usuario.getEmail(),
@@ -273,10 +285,10 @@ public class AuthServiceImpl implements AuthService {
                     tokenExpirationHours + " horas"
             );
             emailService.send(emailTemplate);
-            log.info("Email de verificaciรณn reenviado a: {}", usuario.getEmail());
+            log.info("Email de verificación reenviado a: {}", usuario.getEmail());
         } catch (Exception e) {
-            log.error("Error al reenviar email de verificaciรณn: {}", e.getMessage(), e);
-            throw new OperacionNoPermitidaException("No se pudo enviar el email de verificaciรณn. Intente mรกs tarde");
+            log.error("Error al reenviar email de verificación: {}", e.getMessage(), e);
+            throw new OperacionNoPermitidaException("No se pudo enviar el email de verificación. Intente más tarde");
         }
     }
 
@@ -309,11 +321,14 @@ public class AuthServiceImpl implements AuthService {
     public void solicitarResetPassword(String email, String ipOrigen) {
         log.info("Solicitando reseteo de password para email: {} desde IP: {}", email, ipOrigen);
         
+        // Normalizar email para búsqueda
+        String emailNormalizado = DataNormalizer.normalizeEmail(email);
+        
         // Validar la solicitud de reset (anti-abuso)
-        passwordResetService.validarSolicitudReset(email, ipOrigen);
+        passwordResetService.validarSolicitudReset(emailNormalizado, ipOrigen);
         
         // Buscar usuario por email
-        Usuario usuario = usuarioRepository.findByEmail(email)
+        Usuario usuario = usuarioRepository.findByEmail(emailNormalizado)
                 .orElseThrow(() -> new RecursoNoEncontradoException("Usuario no encontrado"));
 
         // Generar token de reset y enviar email
