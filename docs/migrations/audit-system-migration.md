@@ -81,31 +81,136 @@ public class AuditRevisionEntity {
 - Pertenece al módulo `database` porque es una entidad JPA que maneja persistencia
 - Forma parte de la infraestructura de base de datos, no del dominio
 
-#### 1.3. Crear `AuditRevisionListener` en el módulo `database`
-**Archivo**: `database/src/main/java/com/matias/database/audit/AuditRevisionListener.java`
+#### 1.3. Crear Puerto `AuditUserProvider` en el módulo `domain`
+
+Para respetar la arquitectura hexagonal y evitar que `database` dependa de `security`, creamos un puerto en `domain`:
+
+**Archivo**: `domain/src/main/java/com/matias/domain/port/AuditUserProvider.java`
 
 ```java
-package com.matias.database.audit;
+package com.matias.domain.port;
 
+/**
+ * Puerto para obtener información del usuario actual en contextos de auditoría.
+ * Implementado por el módulo de seguridad.
+ */
+public interface AuditUserProvider {
+    
+    /**
+     * Obtiene el email del usuario autenticado actual
+     * 
+     * @return Email del usuario, o "SYSTEM" si no hay usuario autenticado
+     */
+    String getCurrentUserEmail();
+    
+    /**
+     * Obtiene el ID del usuario autenticado actual
+     * 
+     * @return ID del usuario, o null si no hay usuario autenticado
+     */
+    Integer getCurrentUserId();
+}
+```
+
+**Justificación**:
+- El puerto está en `domain` (capa más interna)
+- Define el contrato sin conocer detalles de implementación
+- Permite que `database` obtenga información del usuario sin conocer Spring Security
+
+#### 1.4. Implementar el Puerto en el módulo `security`
+
+**Archivo**: `security/src/main/java/com/matias/security/service/AuditUserProviderImpl.java`
+
+```java
+package com.matias.security.service;
+
+import com.matias.domain.port.AuditUserProvider;
 import com.matias.security.model.SecurityUser;
-import org.hibernate.envers.RevisionListener;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
 
 @Component
-public class AuditRevisionListener implements RevisionListener {
+public class AuditUserProviderImpl implements AuditUserProvider {
+
+    @Override
+    public String getCurrentUserEmail() {
+        try {
+            Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+            
+            if (auth != null && auth.isAuthenticated() && 
+                !auth.getPrincipal().equals("anonymousUser") &&
+                auth.getPrincipal() instanceof SecurityUser securityUser) {
+                return securityUser.getUsername();
+            }
+        } catch (Exception e) {
+            // Log si es necesario
+        }
+        return "SYSTEM";
+    }
+
+    @Override
+    public Integer getCurrentUserId() {
+        try {
+            Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+            
+            if (auth != null && auth.isAuthenticated() && 
+                !auth.getPrincipal().equals("anonymousUser") &&
+                auth.getPrincipal() instanceof SecurityUser securityUser) {
+                return securityUser.getId();
+            }
+        } catch (Exception e) {
+            // Log si es necesario
+        }
+        return null;
+    }
+}
+```
+
+**Justificación**:
+- El módulo `security` tiene acceso a `SecurityContextHolder` y `SecurityUser`
+- Implementa el puerto definido en `domain`
+- Maneja casos edge (usuario anónimo, sin autenticación)
+
+#### 1.5. Crear `AuditRevisionListener` en el módulo `database`
+
+Ahora el listener puede acceder al usuario a través del puerto, sin depender directamente de `security`:
+
+**Archivo**: `database/src/main/java/com/matias/database/audit/AuditRevisionListener.java`
+
+```java
+package com.matias.database.audit;
+
+import com.matias.domain.port.AuditUserProvider;
+import org.hibernate.envers.RevisionListener;
+import org.springframework.context.ApplicationContext;
+import org.springframework.context.ApplicationContextAware;
+import org.springframework.stereotype.Component;
+
+/**
+ * Listener de Envers que captura el usuario autenticado actual.
+ * Usa ApplicationContextAware para obtener el bean AuditUserProvider
+ * ya que Hibernate instancia este listener directamente.
+ */
+@Component
+public class AuditRevisionListener implements RevisionListener, ApplicationContextAware {
+
+    private static ApplicationContext applicationContext;
+
+    @Override
+    public void setApplicationContext(ApplicationContext context) {
+        applicationContext = context;
+    }
 
     @Override
     public void newRevision(Object revisionEntity) {
         AuditRevisionEntity revision = (AuditRevisionEntity) revisionEntity;
 
         try {
-            Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-
-            if (auth != null && auth.isAuthenticated() && auth.getPrincipal() instanceof SecurityUser securityUser) {
-                revision.setUsuarioEmail(securityUser.getUsername());
-                revision.setUsuarioId(securityUser.getId());
+            if (applicationContext != null) {
+                AuditUserProvider auditUserProvider = applicationContext.getBean(AuditUserProvider.class);
+                revision.setUsuarioEmail(auditUserProvider.getCurrentUserEmail());
+                revision.setUsuarioId(auditUserProvider.getCurrentUserId());
             } else {
                 revision.setUsuarioEmail("SYSTEM");
             }
@@ -116,21 +221,27 @@ public class AuditRevisionListener implements RevisionListener {
 }
 ```
 
-**⚠️ NOTA IMPORTANTE**: 
-- Este listener accede a `SecurityUser` del módulo `security`
-- El módulo `database` debe tener una dependencia sobre el módulo `security` en su `pom.xml`
-- Esto es pragmático: necesitamos el contexto de seguridad para identificar al usuario que realiza cambios
+**⚠️ SOLUCIÓN ARQUITECTÓNICA CLAVE**:
+- **Problema**: Hibernate instancia `RevisionListener` directamente, sin pasar por Spring IoC
+- **Solución**: Usar `ApplicationContextAware` para acceder al contexto de Spring de forma programática
+- **Beneficio**: El módulo `database` NO depende del módulo `security`
+- **Inversión de Dependencias**: `database` depende del puerto en `domain`, `security` implementa el puerto
+- **Respeta Arquitectura Hexagonal**: Las dependencias fluyen hacia el dominio
 
-#### 1.4. Actualizar `database/pom.xml` con dependencia a `security`
+#### 1.6. **IMPORTANTE: NO agregar dependencia a `security` en `database/pom.xml`**
+
+El módulo `database` **NO** debe tener dependencia sobre `security`. Solo necesita:
 
 ```xml
-<!-- Dependencia al módulo security para obtener SecurityUser en AuditRevisionListener -->
+<!-- Dependencia al dominio (donde está el puerto AuditUserProvider) -->
 <dependency>
     <groupId>com.matias</groupId>
-    <artifactId>security</artifactId>
+    <artifactId>domain</artifactId>
     <version>${project.version}</version>
 </dependency>
 ```
+
+Esta dependencia ya existe, por lo que no hay que agregar nada nuevo en el `pom.xml` de `database`.
 
 ---
 

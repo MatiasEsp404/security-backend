@@ -1126,159 +1126,147 @@ Una vez implementado:
 
 ## 9. Sistema de Auditoría con Historial de Cambios
 
+> **Estado**: ⏳ Pendiente  
+> **Documentación Detallada**: Ver [`docs/migrations/audit-system-migration.md`](./audit-system-migration.md)
+
 ### 🎯 Objetivo
-Implementar un sistema de auditoría que registre automáticamente cambios en entidades críticas (usuarios, roles, etc.) para trazabilidad y cumplimiento normativo.
+Implementar un sistema robusto de auditoría usando **Spring Data Envers** que registre automáticamente todos los cambios en entidades críticas (usuarios, roles) con información completa de quién, qué y cuándo se modificó.
 
 ### 📊 Análisis del Sistema Actual (seguridad-back)
 
 **Componentes:**
-- `@EntityListeners(AuditingEntityListener.class)` en entidades
-- `@CreatedDate`, `@LastModifiedDate`, `@CreatedBy`, `@LastModifiedBy`
-- Configuración JPA Auditing con `@EnableJpaAuditing`
-- Tabla de historial de cambios (opcional)
+- `AuditRevisionEntity`: Entidad custom que extiende DefaultRevisionEntity
+- `AuditRevisionListener`: Listener que captura el usuario autenticado
+- `UsuarioAuditService`: Servicio para consultar historial
+- `@Audited` en `UsuarioEntity` y `UsuarioRolEntity`
+- Endpoint `GET /admin/users/{userId}/audit-log`
 
 ### 🏗️ Diseño según Arquitectura Hexagonal
 
-#### **Módulo: `app-root`**
-```
-app-root/src/main/java/com/matias/
-└── config/
-    └── JpaAuditingConfig.java                // Habilitar auditoría
-```
+#### **Desafío Arquitectónico Principal: RevisionListener**
 
-**Configuración:**
-```java
-@Configuration
-@EnableJpaAuditing
-public class JpaAuditingConfig {
-    
-    @Bean
-    public AuditorAware<String> auditorProvider() {
-        return () -> {
-            Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-            if (auth == null || !auth.isAuthenticated() || 
-                auth.getPrincipal().equals("anonymousUser")) {
-                return Optional.of("SYSTEM");
-            }
-            return Optional.of(auth.getName());
-        };
-    }
-}
-```
+**Problema:**
+- `RevisionListener` es instanciado por Hibernate (no por Spring IoC)
+- Necesita acceder al usuario autenticado de `SecurityContext`
+- El módulo `database` NO debe depender del módulo `security` (violaría arquitectura hexagonal)
 
-#### **Módulo: `database`**
+**Solución: Inversión de Dependencias con ApplicationContextAware**
 
-**Modificar entidades existentes:**
-```java
-@Entity
-@Table(name = "usuarios")
-@EntityListeners(AuditingEntityListener.class)
-public class UsuarioEntity {
-    
-    // ... campos existentes
-    
-    @CreatedDate
-    @Column(name = "fecha_creacion", nullable = false, updatable = false)
-    private Instant fechaCreacion;
-    
-    @LastModifiedDate
-    @Column(name = "fecha_modificacion")
-    private Instant fechaModificacion;
-    
-    @CreatedBy
-    @Column(name = "creado_por", length = 100)
-    private String creadoPor;
-    
-    @LastModifiedBy
-    @Column(name = "modificado_por", length = 100)
-    private String modificadoPor;
-}
-```
+1. **Crear puerto `AuditUserProvider` en `domain`**:
+   ```java
+   public interface AuditUserProvider {
+       String getCurrentUserEmail();
+       Integer getCurrentUserId();
+   }
+   ```
 
-#### **Sistema Avanzado (Opcional): Historial de Cambios**
+2. **Implementar puerto en `security`**:
+   ```java
+   @Component
+   public class AuditUserProviderImpl implements AuditUserProvider {
+       @Override
+       public String getCurrentUserEmail() {
+           // Accede a SecurityContextHolder
+       }
+   }
+   ```
+
+3. **Usar `ApplicationContextAware` en `AuditRevisionListener`**:
+   ```java
+   @Component
+   public class AuditRevisionListener implements RevisionListener, ApplicationContextAware {
+       private static ApplicationContext applicationContext;
+       
+       @Override
+       public void newRevision(Object revisionEntity) {
+           AuditUserProvider provider = applicationContext.getBean(AuditUserProvider.class);
+           // Usa el puerto sin conocer security
+       }
+   }
+   ```
+
+**✅ Resultado:** El módulo `database` depende solo de `domain` (donde está el puerto), y `security` implementa el puerto. **Arquitectura hexagonal respetada.**
+
+#### **Módulos Involucrados:**
 
 **Módulo: `domain`**
 ```
 domain/src/main/java/com/matias/domain/
-├── model/
-│   ├── AuditLog.java                         // Modelo de historial
-│   └── TipoOperacion.java                    // Enum: CREATE, UPDATE, DELETE
-└── port/
-    └── AuditLogRepositoryPort.java           // Puerto
+├── port/
+│   ├── AuditUserProvider.java                // Puerto para obtener usuario actual
+│   ├── UsuarioAuditRepositoryPort.java       // Puerto para consultar auditoría
+└── model/
+    └── audit/
+        ├── FieldChange.java                  // Cambio de un campo
+        ├── RoleAuditLog.java                 // Auditoría de roles
+        └── UsuarioAuditLog.java              // Auditoría de usuario
+```
+
+**Módulo: `security`**
+```
+security/src/main/java/com/matias/security/
+└── service/
+    └── AuditUserProviderImpl.java            // Implementa AuditUserProvider
 ```
 
 **Módulo: `database`**
 ```
 database/src/main/java/com/matias/database/
-├── entity/
-│   └── AuditLogEntity.java                   // Entidad de auditoría
-├── repository/
-│   └── AuditLogJpaRepository.java
-└── adapter/
-    └── AuditLogRepositoryAdapter.java
+├── audit/
+│   ├── AuditRevisionEntity.java              // Entidad de revisión custom
+│   └── AuditRevisionListener.java            // Listener con ApplicationContextAware
+├── adapter/
+│   └── UsuarioAuditRepositoryAdapter.java    // Usa AuditReader de Envers
+└── entity/
+    ├── UsuarioEntity.java                    // @Audited
+    └── UsuarioRolEntity.java                 // @Audited
 ```
 
-**AuditLogEntity:**
-```java
-@Entity
-@Table(name = "audit_logs")
-public class AuditLogEntity {
-    
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
-    
-    @Column(name = "entidad", nullable = false, length = 50)
-    private String entidad; // "Usuario", "UsuarioRol", etc.
-    
-    @Column(name = "entidad_id", nullable = false)
-    private Integer entidadId;
-    
-    @Enumerated(EnumType.STRING)
-    @Column(name = "operacion", nullable = false, length = 20)
-    private TipoOperacion operacion;
-    
-    @Column(name = "usuario", nullable = false, length = 100)
-    private String usuario;
-    
-    @Column(name = "fecha", nullable = false)
-    private Instant fecha;
-    
-    @Column(name = "cambios", columnDefinition = "TEXT")
-    private String cambios; // JSON con los cambios
-    
-    @Column(name = "ip", length = 45)
-    private String ip;
-}
+**Módulo: `application`**
+```
+application/src/main/java/com/matias/application/
+└── service/
+    ├── UsuarioAuditService.java              // Interfaz
+    └── impl/
+        └── UsuarioAuditServiceImpl.java      // Implementación
+```
+
+**Módulo: `web`**
+```
+web/src/main/java/com/matias/web/
+├── controller/
+│   └── AdminController.java                  // Endpoint GET /admin/users/{id}/audit-log
+└── dto/
+    └── response/
+        └── UsuarioAuditResponse.java         // DTO con sub-records
 ```
 
 ### ✅ Checklist de Implementación
 
-**Nivel Básico (Auditoría JPA):**
-- [ ] **App-root**: Crear `JpaAuditingConfig`
-- [ ] **Database**: Agregar campos de auditoría a `UsuarioEntity`
-- [ ] **Database**: Agregar `@EntityListeners(AuditingEntityListener.class)`
-- [ ] **Database**: Crear migrations para columnas de auditoría
-- [ ] **Domain**: Actualizar modelo `Usuario` con campos de auditoría
-- [ ] **Testing**: Verificar que se registran fechas y usuarios correctamente
-
-**Nivel Avanzado (Historial Completo):**
-- [ ] **Domain**: Crear `AuditLog` y `TipoOperacion`
-- [ ] **Domain**: Crear `AuditLogRepositoryPort`
-- [ ] **Database**: Crear `AuditLogEntity`
-- [ ] **Database**: Crear `AuditLogJpaRepository`
-- [ ] **Database**: Crear `AuditLogRepositoryAdapter`
-- [ ] **Application**: Crear servicio para registrar cambios
-- [ ] **Application**: Integrar en servicios CRUD (create, update, delete)
-- [ ] **Web**: Crear endpoint `GET /admin/audit-logs` para consulta
-- [ ] **Database**: Crear migration para tabla `audit_logs`
+- [ ] **Domain**: Crear puerto `AuditUserProvider`
+- [ ] **Security**: Implementar `AuditUserProviderImpl`
+- [ ] **Database**: Agregar dependencia `spring-data-envers`
+- [ ] **Database**: Crear `AuditRevisionEntity`
+- [ ] **Database**: Crear `AuditRevisionListener` con `ApplicationContextAware`
+- [ ] **Database**: Anotar `UsuarioEntity` con `@Audited`
+- [ ] **Database**: Anotar `UsuarioRolEntity` con `@Audited`
+- [ ] **Domain**: Crear modelos `FieldChange`, `RoleAuditLog`, `UsuarioAuditLog`
+- [ ] **Domain**: Crear puerto `UsuarioAuditRepositoryPort`
+- [ ] **Database**: Implementar `UsuarioAuditRepositoryAdapter` usando `AuditReader`
+- [ ] **Application**: Crear `UsuarioAuditService` e implementación
+- [ ] **Web**: Crear `UsuarioAuditResponse` (DTO)
+- [ ] **Web**: Agregar endpoint en `AdminController`
+- [ ] **Testing**: Probar registro y consulta de auditoría
+- [ ] **Database**: Crear migration SQL si es necesario
 
 ### 🎯 Beneficios
 
-1. **Trazabilidad**: Saber quién modificó qué y cuándo
-2. **Cumplimiento**: Requisitos de GDPR, ISO 27001, etc.
-3. **Debugging**: Facilita investigar problemas
-4. **Seguridad**: Detectar accesos no autorizados
+1. **Trazabilidad Completa**: Historial detallado de todos los cambios
+2. **Cumplimiento Normativo**: GDPR, SOC2, ISO 27001
+3. **Detección de Anomalías**: Identificar actividades sospechosas
+4. **Arquitectura Limpia**: Respeta inversión de dependencias
+5. **Automático**: Sin código manual de auditoría en cada operación
+6. **Granular**: Registra qué campos específicos cambiaron
 
 ---
 
