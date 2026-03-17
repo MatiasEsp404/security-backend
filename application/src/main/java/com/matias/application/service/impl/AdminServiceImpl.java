@@ -9,6 +9,11 @@ import com.matias.domain.model.Usuario;
 import com.matias.domain.port.UsuarioRepositoryPort;
 import org.springframework.stereotype.Service;
 
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
+import java.util.HashMap;
+import java.util.Map;
+
 @Service
 public class AdminServiceImpl implements AdminService {
 
@@ -54,5 +59,42 @@ public class AdminServiceImpl implements AdminService {
             throw new OperacionNoPermitidaException("El rol USUARIO no puede ser removido");
         }
         usuarioRepository.unassignRole(userId, rol);
+    }
+
+    @Override
+    public Map<String, Object> obtenerEstadisticas() {
+        Map<String, Object> stats = new HashMap<>();
+        
+        // Contadores generales
+        long totalUsuarios = usuarioRepository.count();
+        long usuariosActivos = usuarioRepository.countByActivo(true);
+        long usuariosInactivos = usuarioRepository.countByActivo(false);
+        long emailsVerificados = usuarioRepository.countByEmailVerificado(true);
+        long emailsPendientes = usuarioRepository.countByEmailVerificado(false);
+        
+        // Usuarios nuevos (últimos 30 días)
+        Instant hace30Dias = Instant.now().minus(30, ChronoUnit.DAYS);
+        long nuevosUsuarios = usuarioRepository.countByFechaCreacionAfter(hace30Dias);
+        
+        // Conteo por roles
+        Map<Rol, Long> usuariosPorRol = usuarioRepository.countUsuariosPorRol();
+        
+        // Construir respuesta
+        stats.put("totalUsuarios", totalUsuarios);
+        stats.put("usuariosActivos", usuariosActivos);
+        stats.put("usuariosInactivos", usuariosInactivos);
+        stats.put("emailsVerificados", emailsVerificados);
+        stats.put("emailsPendientes", emailsPendientes);
+        stats.put("nuevosUsuariosUltimos30Dias", nuevosUsuarios);
+        stats.put("usuariosPorRol", usuariosPorRol);
+        
+        return stats;
+    }
+
+    @Override
+    public UsuarioRepositoryPort.PageResult<Usuario> buscarUsuarios(
+            UsuarioRepositoryPort.UsuarioFilter filter,
+            UsuarioRepositoryPort.PageRequest pageRequest) {
+        return usuarioRepository.findAllWithFilters(filter, pageRequest);
     }
 }
