@@ -87,7 +87,7 @@ public class AuthServiceImpl implements AuthService {
             throw new ConflictoException("El email ya está registrado");
         }
 
-        // Crear usuario
+        // Crear usuario sin roles primero
         Usuario usuario = Usuario.builder()
                 .email(emailNormalizado)
                 .password(passwordEncoder.encode(request.password()))
@@ -96,11 +96,18 @@ public class AuthServiceImpl implements AuthService {
                 .fechaCreacion(Instant.now())
                 .activo(true)
                 .emailVerificado(false)
-                .roles(Set.of(Rol.USUARIO))
                 .build();
 
         // Guardar usuario
         Usuario usuarioGuardado = usuarioRepository.save(usuario);
+        
+        // Asignar rol por defecto después de tener el ID del usuario
+        com.matias.domain.model.UsuarioRol usuarioRol = new com.matias.domain.model.UsuarioRol(
+                usuarioGuardado.getId(),
+                Rol.USUARIO
+        );
+        usuarioGuardado.setUsuarioRoles(Set.of(usuarioRol));
+        usuarioGuardado = usuarioRepository.save(usuarioGuardado);
         
         log.info("Usuario registrado exitosamente con ID: {}", usuarioGuardado.getId());
 

@@ -7,6 +7,7 @@ import lombok.NoArgsConstructor;
 
 import java.time.Instant;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 @Data
 @NoArgsConstructor
@@ -23,7 +24,7 @@ public class Usuario {
     private Instant fechaActualizacion;
     private Boolean activo;
     private Boolean emailVerificado;
-    private Set<Rol> roles;
+    private Set<UsuarioRol> usuarioRoles;
 
     public Usuario(String email, String password) {
         this.email = email;
@@ -31,5 +32,20 @@ public class Usuario {
         this.fechaCreacion = Instant.now();
         this.activo = true;
         this.emailVerificado = false;
+    }
+
+    /**
+     * Método helper para obtener solo los roles (sin información de asignación).
+     * Mantiene compatibilidad con código existente que solo necesita los roles.
+     *
+     * @return Set de roles del usuario
+     */
+    public Set<Rol> getRoles() {
+        if (usuarioRoles == null) {
+            return Set.of();
+        }
+        return usuarioRoles.stream()
+                .map(UsuarioRol::getRol)
+                .collect(Collectors.toSet());
     }
 }
