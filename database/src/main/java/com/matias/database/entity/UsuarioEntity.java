@@ -6,6 +6,7 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import org.hibernate.envers.Audited;
 
 import java.time.Instant;
 import java.util.HashSet;
@@ -18,6 +19,7 @@ import java.util.Set;
 @Builder
 @Entity
 @Table(name = "usuarios")
+@Audited
 public class UsuarioEntity {
 
     @Id

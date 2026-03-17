@@ -3,11 +3,14 @@ package com.matias.web.controller;
 import com.matias.application.service.AdminService;
 import com.matias.domain.model.Rol;
 import com.matias.domain.model.Usuario;
+import com.matias.domain.model.UsuarioAudit;
+import com.matias.domain.port.UsuarioAuditRepositoryPort;
 import com.matias.domain.port.UsuarioRepositoryPort;
 import com.matias.web.dto.request.UpdateUserStatusRequest;
 import com.matias.web.dto.request.UsuarioFilterRequest;
 import com.matias.web.dto.response.PageResponse;
 import com.matias.web.dto.response.StatsResponse;
+import com.matias.web.dto.response.UsuarioAuditResponse;
 import com.matias.web.dto.response.UsuarioListItemResponse;
 import com.matias.web.dto.response.UsuarioRolResponse;
 import io.swagger.v3.oas.annotations.Operation;
@@ -209,5 +212,58 @@ public class AdminController {
     ) {
         adminService.unassignRole(userId, rol);
         return ResponseEntity.ok().build();
+    }
+
+    @GetMapping("/users/{userId}/audit")
+    @PreAuthorize("hasRole('ADMINISTRADOR')")
+    @Operation(
+        summary = "Obtener historial de auditoría de un usuario",
+        description = "Devuelve el historial completo de cambios realizados sobre un usuario"
+    )
+    @ApiResponse(responseCode = "200", description = "Historial obtenido exitosamente")
+    @ApiResponse(responseCode = "404", description = "Usuario no encontrado")
+    public ResponseEntity<PageResponse<UsuarioAuditResponse>> obtenerHistorialUsuario(
+            @Parameter(description = "ID del usuario") @PathVariable Integer userId,
+            @Parameter(description = "Número de página (0-indexed)") @RequestParam(defaultValue = "0") int page,
+            @Parameter(description = "Tamaño de página") @RequestParam(defaultValue = "20") int size,
+            @Parameter(description = "Dirección de ordenamiento") @RequestParam(defaultValue = "DESC") String direction
+    ) {
+        UsuarioAuditRepositoryPort.SortDirection sortDirection = "ASC".equalsIgnoreCase(direction) 
+            ? UsuarioAuditRepositoryPort.SortDirection.ASC 
+            : UsuarioAuditRepositoryPort.SortDirection.DESC;
+        
+        UsuarioAuditRepositoryPort.PageRequest pageRequest = 
+            new UsuarioAuditRepositoryPort.PageRequest(page, size, sortDirection);
+        
+        UsuarioAuditRepositoryPort.PageResult<UsuarioAudit> auditPage = 
+            adminService.obtenerHistorialUsuario(userId, pageRequest);
+        
+        // Convertir a DTO
+        List<UsuarioAuditResponse> content = auditPage.content().stream()
+            .map(audit -> new UsuarioAuditResponse(
+                audit.usuarioId(),
+                audit.email(),
+                audit.nombre(),
+                audit.apellido(),
+                audit.activo(),
+                audit.emailVerificado(),
+                audit.revision(),
+                audit.fechaRevision(),
+                audit.usuarioModificador(),
+                audit.tipoRevision()
+            ))
+            .collect(Collectors.toList());
+
+        PageResponse<UsuarioAuditResponse> response = new PageResponse<>(
+            content,
+            auditPage.pageNumber(),
+            auditPage.pageSize(),
+            auditPage.totalElements(),
+            auditPage.totalPages(),
+            auditPage.isFirst(),
+            auditPage.isLast()
+        );
+
+        return ResponseEntity.ok(response);
     }
 }

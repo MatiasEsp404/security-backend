@@ -2,6 +2,8 @@ package com.matias.application.service;
 
 import com.matias.domain.model.Rol;
 import com.matias.domain.model.Usuario;
+import com.matias.domain.model.UsuarioAudit;
+import com.matias.domain.port.UsuarioAuditRepositoryPort;
 import com.matias.domain.port.UsuarioRepositoryPort;
 
 import java.util.Map;
@@ -17,5 +19,11 @@ public interface AdminService {
     UsuarioRepositoryPort.PageResult<Usuario> buscarUsuarios(
             UsuarioRepositoryPort.UsuarioFilter filter,
             UsuarioRepositoryPort.PageRequest pageRequest
+    );
+    
+    // Auditoría
+    UsuarioAuditRepositoryPort.PageResult<UsuarioAudit> obtenerHistorialUsuario(
+            Integer userId, 
+            UsuarioAuditRepositoryPort.PageRequest pageRequest
     );
 }

@@ -6,6 +6,8 @@ import com.matias.domain.exception.OperacionNoPermitidaException;
 import com.matias.domain.exception.RecursoNoEncontradoException;
 import com.matias.domain.model.Rol;
 import com.matias.domain.model.Usuario;
+import com.matias.domain.model.UsuarioAudit;
+import com.matias.domain.port.UsuarioAuditRepositoryPort;
 import com.matias.domain.port.UsuarioRepositoryPort;
 import org.springframework.stereotype.Service;
 
@@ -18,9 +20,12 @@ import java.util.Map;
 public class AdminServiceImpl implements AdminService {
 
     private final UsuarioRepositoryPort usuarioRepository;
+    private final UsuarioAuditRepositoryPort usuarioAuditRepository;
 
-    public AdminServiceImpl(UsuarioRepositoryPort usuarioRepository) {
+    public AdminServiceImpl(UsuarioRepositoryPort usuarioRepository,
+                           UsuarioAuditRepositoryPort usuarioAuditRepository) {
         this.usuarioRepository = usuarioRepository;
+        this.usuarioAuditRepository = usuarioAuditRepository;
     }
 
     @Override
@@ -96,5 +101,15 @@ public class AdminServiceImpl implements AdminService {
             UsuarioRepositoryPort.UsuarioFilter filter,
             UsuarioRepositoryPort.PageRequest pageRequest) {
         return usuarioRepository.findAllWithFilters(filter, pageRequest);
+    }
+
+    @Override
+    public UsuarioAuditRepositoryPort.PageResult<UsuarioAudit> obtenerHistorialUsuario(
+            Integer userId, 
+            UsuarioAuditRepositoryPort.PageRequest pageRequest) {
+        // Verificar que el usuario existe
+        obtenerDetalleUsuario(userId);
+        
+        return usuarioAuditRepository.findAuditByUsuarioId(userId, pageRequest);
     }
 }
