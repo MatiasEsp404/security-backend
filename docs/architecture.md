@@ -6,15 +6,7 @@ In an **N-Tier** architecture, the system is divided into isolated layers. The m
 
 ---
 
-## 🛠️ Pragmatic Hexagonal Architecture
 
-While we draw heavy inspiration from Clean Architecture and Hexagonal Architecture, we are **pragmatic developers**, not purists. 
-
-Strict Clean Architecture dictates that internal layers (like `application` or `domain`) must remain absolutely agnostic of any external frameworks, relying entirely on pure Java. However, to accelerate development and avoid boilerplate, we embrace the **Spring Framework** as our core platform rather than a simple library. 
-
-This means it is completely acceptable to use annotations like `@Service`, `@Autowired`, or `@Transactional` within the `application` layer. We sacrifice a bit of strict framework agnosticism in exchange for development speed and ecosystem integration, while still maintaining the core N-Tier separation of concerns.
-
----
 
 ## 📦 Main Modules and their Roles
 
@@ -28,7 +20,7 @@ This is the innermost and most agnostic module. It is the heart of the applicati
 ### 2. `application` (Use Cases)
 Responsible for orchestrating the business logic.
 - **Contains:** Implementation of use cases, application services, and interfaces defining external operations if they exist. Business validations and processes that affect domain entities are executed here.
-- **Dependencies:** Primarily depends on `domain`. *Pragmatic note: Uses `spring-context` to leverage `@Service`.* 
+- **Dependencies:** Primarily depends on `domain`. Uses `spring-context` for dependency injection (`@Service`).
 
 ### 3. `database` (Data Persistence)
 Acts as the adapter for the data access layer.
