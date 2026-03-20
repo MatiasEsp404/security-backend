@@ -6,13 +6,13 @@ import com.matias.domain.exception.OperacionNoPermitidaException;
 import com.matias.domain.exception.RecursoNoEncontradoException;
 import com.matias.domain.model.*;
 import com.matias.domain.port.EmailServicePort;
+import com.matias.domain.port.PasswordHashingPort;
 import com.matias.domain.port.PasswordResetIntentoRepositoryPort;
 import com.matias.domain.port.TokenPasswordResetRepositoryPort;
 import com.matias.domain.port.UsuarioRepositoryPort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -37,7 +37,7 @@ public class PasswordResetServiceImpl implements PasswordResetService {
     private final TokenPasswordResetRepositoryPort tokenPasswordResetRepositoryPort;
     private final PasswordResetIntentoRepositoryPort intentoRepositoryPort;
     private final UsuarioRepositoryPort usuarioRepositoryPort;
-    private final PasswordEncoder passwordEncoder;
+    private final PasswordHashingPort passwordHashingPort;
     private final EmailServicePort emailServicePort;
 
     @Override
@@ -90,7 +90,7 @@ public class PasswordResetServiceImpl implements PasswordResetService {
         tokenPasswordResetRepositoryPort.save(tokenEntity);
 
         Usuario usuario = tokenEntity.getUsuario();
-        String passwordCifrada = passwordEncoder.encode(nuevaPassword);
+        String passwordCifrada = passwordHashingPort.encode(nuevaPassword);
         usuario.setPassword(passwordCifrada);
         usuarioRepositoryPort.save(usuario);
 

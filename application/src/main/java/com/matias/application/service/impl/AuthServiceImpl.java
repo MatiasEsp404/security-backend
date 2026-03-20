@@ -22,10 +22,10 @@ import com.matias.domain.port.TokenInvalidoRepositoryPort;
 import com.matias.domain.port.TokenServicePort;
 import com.matias.domain.port.TokenVerificacionRepositoryPort;
 import com.matias.domain.port.UsuarioRepositoryPort;
+import com.matias.domain.port.PasswordHashingPort;
 import com.matias.domain.util.DataNormalizer;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
@@ -39,7 +39,7 @@ public class AuthServiceImpl implements AuthService {
 
     private final UsuarioRepositoryPort usuarioRepository;
     private final TokenServicePort tokenService;
-    private final PasswordEncoder passwordEncoder;
+    private final PasswordHashingPort passwordHashingPort;
     private final TokenVerificacionRepositoryPort tokenVerificacionRepository;
     private final EmailServicePort emailService;
     private final VerificacionEmailService verificacionEmailService;
@@ -57,7 +57,7 @@ public class AuthServiceImpl implements AuthService {
 
     public AuthServiceImpl(UsuarioRepositoryPort usuarioRepository, 
                           TokenServicePort tokenService,
-                          PasswordEncoder passwordEncoder,
+                          PasswordHashingPort passwordHashingPort,
                           TokenVerificacionRepositoryPort tokenVerificacionRepository,
                           EmailServicePort emailService,
                           VerificacionEmailService verificacionEmailService,
@@ -65,7 +65,7 @@ public class AuthServiceImpl implements AuthService {
                           TokenInvalidoRepositoryPort tokenInvalidoRepository) {
         this.usuarioRepository = usuarioRepository;
         this.tokenService = tokenService;
-        this.passwordEncoder = passwordEncoder;
+        this.passwordHashingPort = passwordHashingPort;
         this.tokenVerificacionRepository = tokenVerificacionRepository;
         this.emailService = emailService;
         this.verificacionEmailService = verificacionEmailService;
@@ -90,7 +90,7 @@ public class AuthServiceImpl implements AuthService {
         // Crear usuario sin roles primero
         Usuario usuario = Usuario.builder()
                 .email(emailNormalizado)
-                .password(passwordEncoder.encode(request.password()))
+                .password(passwordHashingPort.encode(request.password()))
                 .nombre(nombreNormalizado)
                 .apellido(apellidoNormalizado)
                 .fechaCreacion(Instant.now())
@@ -154,7 +154,7 @@ public class AuthServiceImpl implements AuthService {
                 .orElseThrow(() -> new NoAutenticadoException("Credenciales inválidas"));
 
         // Verificar contraseña
-        if (!passwordEncoder.matches(request.password(), usuario.getPassword())) {
+        if (!passwordHashingPort.matches(request.password(), usuario.getPassword())) {
             throw new NoAutenticadoException("Credenciales inválidas");
         }
 
