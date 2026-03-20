@@ -14,15 +14,15 @@ Este documento detalla los hallazgos tras la revisión exhaustiva de dependencia
 ## 🔴 Infracciones GRAVES
 *(Fuga de detalles de implementación a los módulos core - `domain` y `application`)*
 
-**1. Fuga de Spring Security a Casos de Uso**
+**1. [RESUELTO] Fuga de Spring Security a Casos de Uso**
 - **Archivo:** `c:\Projects\security-backend\application\pom.xml` y Servicios (ej. `AuthServiceImpl.java`, `PasswordResetServiceImpl.java`).
 - **Descripción de la infracción:** El módulo `application` importa `spring-boot-starter-security` y utiliza directamente componentes como el bean `PasswordEncoder` en los servicios de negocio/aplicación. Esta dependencia inyecta detalles específicos de cifrado y el marco conceptual de Spring Security de infraestructura en los casos de uso, rompiendo la inversión de dependencia.
-- **Sugerencia de corrección:** Declarar un puerto `PasswordHashingPort` en `domain` (o en `application`), utilizar dicha abstracción en los servicios de aplicación (`AuthServiceImpl`) e implementar la lógica de Spring Security `PasswordEncoder` en un adaptador dedicado en el módulo de infraestructura de seguridad (`security`).
+- **Estado de resolución:** Se verificó que la dependencia de Spring Security fue removida del `pom.xml` de `application` y ya no hay usos directos de clases de Spring Security en los servicios de dicha capa.
 
-**2. Fuga de Swagger/OpenAPI al modelo de Aplicación**
+**2. [RESUELTO] Fuga de Swagger/OpenAPI al modelo de Aplicación**
 - **Archivo:** `c:\Projects\security-backend\application\pom.xml` y DTOs (`UsuarioResponse.java`, `RegistroRequest.java`, `LogueoRequest.java`, etc.).
 - **Descripción de la infracción:** El módulo `application` contiene múltiples clases DTO anotadas con `@Schema` perteneciente a `io.swagger.v3` (springdoc-openapi). Esto es conocimiento puro de presentación y API web goteando hacia la capa de casos de uso (Application layer), acoplando las operaciones interinas con documentación de Web.
-- **Sugerencia de corrección:** Eliminar la dependencia de `springdoc` del módulo `application`. Crear DTOs específicos de Request y Response web en el módulo `web` (que serían los portadores de anotaciones OpenAPI) e implementar ahí el mapeo hacia o desde comandos/respuestas de la capa de aplicación.
+- **Estado de resolución:** Se verificó que la dependencia de `springdoc-openapi` fue removida del `pom.xml` de `application` y las anotaciones de Swagger ya no existen en los DTOs de este nivel.
 
 ---
 
