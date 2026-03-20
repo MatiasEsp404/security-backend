@@ -1,7 +1,8 @@
 package com.matias.web.controller;
 
-import com.matias.application.dto.response.UsuarioResponse;
 import com.matias.application.service.UsuarioService;
+import com.matias.web.dto.response.UsuarioWebResponse;
+import com.matias.web.mapper.UsuarioWebMapper;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -21,6 +22,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class UsuarioController {
 
     private final UsuarioService usuarioService;
+    private final UsuarioWebMapper usuarioWebMapper;
 
     @Operation(
             summary = "Obtener información del usuario actual",
@@ -32,9 +34,10 @@ public class UsuarioController {
             @ApiResponse(responseCode = "404", description = "Usuario no encontrado", content = @Content)
     })
     @GetMapping("/me")
-    public ResponseEntity<UsuarioResponse> obtenerInfoUsuarioActual(Authentication authentication) {
+    public ResponseEntity<UsuarioWebResponse> obtenerInfoUsuarioActual(Authentication authentication) {
         String email = authentication.getName();
-        UsuarioResponse response = usuarioService.obtenerInfoUsuario(email);
-        return ResponseEntity.ok(response);
+        var appResponse = usuarioService.obtenerInfoUsuario(email);
+        var webResponse = usuarioWebMapper.toUsuarioWebResponse(appResponse);
+        return ResponseEntity.ok(webResponse);
     }
 }

@@ -3,13 +3,14 @@ package com.matias.web.controller;
 import com.matias.application.service.AuthService;
 import com.matias.application.service.PasswordResetService;
 import com.matias.application.dto.internal.TokenInternal;
-import com.matias.web.dto.request.ConfirmarResetPasswordRequest;
-import com.matias.application.dto.request.LogueoRequest;
 import com.matias.application.dto.request.ReenvioEmailRequest;
-import com.matias.application.dto.request.RegistroRequest;
+import com.matias.web.dto.request.ConfirmarResetPasswordRequest;
+import com.matias.web.dto.request.LogueoWebRequest;
+import com.matias.web.dto.request.RegistroWebRequest;
 import com.matias.web.dto.request.SolicitudResetPasswordRequest;
-import com.matias.application.dto.response.RegistroResponse;
-import com.matias.application.dto.response.TokenResponse;
+import com.matias.web.dto.response.RegistroWebResponse;
+import com.matias.web.dto.response.TokenWebResponse;
+import com.matias.web.mapper.AuthWebMapper;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -43,10 +44,12 @@ public class AuthController {
 
     private final AuthService authService;
     private final PasswordResetService passwordResetService;
+    private final AuthWebMapper authWebMapper;
 
-    public AuthController(AuthService authService, PasswordResetService passwordResetService) {
+    public AuthController(AuthService authService, PasswordResetService passwordResetService, AuthWebMapper authWebMapper) {
         this.authService = authService;
         this.passwordResetService = passwordResetService;
+        this.authWebMapper = authWebMapper;
     }
 
     @Operation(summary = "Registrar usuario", description = "Crea un usuario y envía un email para verificar la cuenta.")
@@ -56,14 +59,16 @@ public class AuthController {
             @ApiResponse(responseCode = "409", description = "Email ya registrado", content = @Content)
     })
     @PostMapping("/register")
-    public ResponseEntity<RegistroResponse> register(@Valid @RequestBody RegistroRequest request) {
-        RegistroResponse response = authService.register(request);
+    public ResponseEntity<RegistroWebResponse> register(@Valid @RequestBody RegistroWebRequest webRequest) {
+        var appRequest = authWebMapper.toRegistroRequest(webRequest);
+        var appResponse = authService.register(appRequest);
+        var webResponse = authWebMapper.toRegistroWebResponse(appResponse);
         URI location = ServletUriComponentsBuilder
                 .fromCurrentContextPath()
                 .path("/api/v1/usuario/me")
                 .build()
                 .toUri();
-        return ResponseEntity.created(location).body(response);
+        return ResponseEntity.created(location).body(webResponse);
     }
 
     @Operation(summary = "Iniciar sesión", description = "Autentica al usuario y devuelve tokens JWT.")
@@ -73,10 +78,12 @@ public class AuthController {
             @ApiResponse(responseCode = "403", description = "Email no verificado", content = @Content)
     })
     @PostMapping("/login")
-    public ResponseEntity<TokenResponse> login(@Valid @RequestBody LogueoRequest request, HttpServletResponse response) {
-        TokenInternal tokens = authService.login(request);
+    public ResponseEntity<TokenWebResponse> login(@Valid @RequestBody LogueoWebRequest webRequest, HttpServletResponse response) {
+        var appRequest = authWebMapper.toLogueoRequest(webRequest);
+        TokenInternal tokens = authService.login(appRequest);
         addRefreshTokenCookie(response, tokens.refreshToken(), Duration.ofDays(7));
-        return ResponseEntity.ok(new TokenResponse(tokens.accessToken()));
+        var webResponse = authWebMapper.toTokenWebResponse(new com.matias.application.dto.response.TokenResponse(tokens.accessToken()));
+        return ResponseEntity.ok(webResponse);
     }
 
     @Operation(summary = "Refrescar tokens", description = "Genera un nuevo access token usando un refresh token válido.")
@@ -86,7 +93,7 @@ public class AuthController {
             @ApiResponse(responseCode = "404", description = "Token no encontrado", content = @Content)
     })
     @PostMapping("/refresh")
-    public ResponseEntity<TokenResponse> refresh(HttpServletRequest request, HttpServletResponse response) {
+    public ResponseEntity<TokenWebResponse> refresh(HttpServletRequest request, HttpServletResponse response) {
         String refreshToken = extractRefreshTokenFromCookie(request);
         if (refreshToken == null) {
             String ipOrigen = obtenerIpCliente(request);
@@ -96,7 +103,8 @@ public class AuthController {
         }
         TokenInternal tokens = authService.refresh(refreshToken);
         addRefreshTokenCookie(response, tokens.refreshToken(), Duration.ofDays(7));
-        return ResponseEntity.ok(new TokenResponse(tokens.accessToken()));
+        var webResponse = authWebMapper.toTokenWebResponse(new com.matias.application.dto.response.TokenResponse(tokens.accessToken()));
+        return ResponseEntity.ok(webResponse);
     }
 
     @Operation(summary = "Cerrar sesión", description = "Invalida el refresh token del usuario.")

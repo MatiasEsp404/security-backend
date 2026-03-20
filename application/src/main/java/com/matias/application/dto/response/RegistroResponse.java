@@ -1,14 +1,11 @@
 package com.matias.application.dto.response;
 
-import io.swagger.v3.oas.annotations.media.Schema;
-
-@Schema(description = "Datos del usuario registrado")
+/**
+ * DTO de respuesta tras el registro de un usuario.
+ * Contrato limpio de la capa de aplicación sin dependencias de infraestructura.
+ */
 public record RegistroResponse(
-
-        @Schema(description = "ID del usuario", example = "42")
         Integer id,
-
-        @Schema(description = "Email del usuario", example = "usuario@example.com")
         String email
 ) {
 

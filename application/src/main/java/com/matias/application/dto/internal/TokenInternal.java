@@ -1,8 +1,9 @@
 package com.matias.application.dto.internal;
 
-import io.swagger.v3.oas.annotations.Hidden;
-
-@Hidden
+/**
+ * DTO interno para transportar tokens entre capas.
+ * No se expone directamente en la API REST.
+ */
 public record TokenInternal(
         String accessToken,
         String refreshToken

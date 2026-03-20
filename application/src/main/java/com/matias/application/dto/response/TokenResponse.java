@@ -1,11 +1,10 @@
 package com.matias.application.dto.response;
 
-import io.swagger.v3.oas.annotations.media.Schema;
-
-@Schema(description = "Token JWT generado para el usuario")
+/**
+ * DTO de respuesta con el token de acceso JWT.
+ * Contrato limpio de la capa de aplicación sin dependencias de infraestructura.
+ */
 public record TokenResponse(
-
-        @Schema(description = "Access Token JWT (duración corta)", example = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...")
         String accessToken
 ) {
 
