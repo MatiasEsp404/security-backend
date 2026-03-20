@@ -23,7 +23,6 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -40,7 +39,6 @@ public class AdminController {
     private final AdminService adminService;
 
     @GetMapping("/stats")
-    @PreAuthorize("hasRole('ADMINISTRADOR')")
     @Operation(
         summary = "Obtener estadísticas del sistema",
         description = "Devuelve estadísticas generales sobre usuarios, roles y actividad"
@@ -70,7 +68,6 @@ public class AdminController {
     }
 
     @GetMapping("/users")
-    @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'MODERADOR')")
     @Operation(
         summary = "Buscar usuarios con filtros",
         description = "Permite buscar usuarios aplicando múltiples filtros y paginación"
@@ -138,7 +135,6 @@ public class AdminController {
     }
 
     @GetMapping("/users/{userId}")
-    @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'MODERADOR')")
     @Operation(
         summary = "Obtener detalles de un usuario",
         description = "Devuelve información completa de un usuario específico"
@@ -164,7 +160,6 @@ public class AdminController {
     }
 
     @PatchMapping("/users/{userId}/status")
-    @PreAuthorize("hasRole('ADMINISTRADOR')")
     @Operation(
         summary = "Actualizar estado de un usuario",
         description = "Activa o desactiva un usuario. No se pueden desactivar usuarios con rol ADMINISTRADOR o MODERADOR"
@@ -181,7 +176,6 @@ public class AdminController {
     }
 
     @PostMapping("/users/{userId}/roles/{rol}")
-    @PreAuthorize("hasRole('ADMINISTRADOR')")
     @Operation(
         summary = "Asignar rol a un usuario",
         description = "Asigna un rol adicional a un usuario existente"
@@ -198,7 +192,6 @@ public class AdminController {
     }
 
     @DeleteMapping("/users/{userId}/roles/{rol}")
-    @PreAuthorize("hasRole('ADMINISTRADOR')")
     @Operation(
         summary = "Remover rol de un usuario",
         description = "Remueve un rol de un usuario. El rol USUARIO no puede ser removido"
@@ -215,7 +208,6 @@ public class AdminController {
     }
 
     @GetMapping("/users/{userId}/audit")
-    @PreAuthorize("hasRole('ADMINISTRADOR')")
     @Operation(
         summary = "Obtener historial de auditoría de un usuario",
         description = "Devuelve el historial completo de cambios realizados sobre un usuario"

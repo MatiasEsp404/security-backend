@@ -10,7 +10,6 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -34,9 +33,8 @@ public class UsuarioController {
             @ApiResponse(responseCode = "404", description = "Usuario no encontrado", content = @Content)
     })
     @GetMapping("/me")
-    public ResponseEntity<UsuarioWebResponse> obtenerInfoUsuarioActual(Authentication authentication) {
-        String email = authentication.getName();
-        var appResponse = usuarioService.obtenerInfoUsuario(email);
+    public ResponseEntity<UsuarioWebResponse> obtenerInfoUsuarioActual() {
+        var appResponse = usuarioService.obtenerInfoUsuario();
         var webResponse = usuarioWebMapper.toUsuarioWebResponse(appResponse);
         return ResponseEntity.ok(webResponse);
     }

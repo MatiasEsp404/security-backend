@@ -29,10 +29,18 @@ Este documento detalla los hallazgos tras la revisión exhaustiva de dependencia
 ## 🟠 Infracciones MODERADAS
 *(Lógica de negocio fuera del core o acoplamientos innecesarios)*
 
-**1. Acoplamiento entre Adaptadores de Infraestructura**
+**1. ~~Acoplamiento entre Adaptadores de Infraestructura~~ ✅ CORREGIDO**
 - **Archivo:** `c:\Projects\security-backend\web\pom.xml`
-- **Descripción de la infracción:** Según el POM, el adaptador `web` depende directamente del adaptador `security`. La arquitectura hexagonal exige que los adaptadores se ignoren mutuamente (cada adaptador primario o secundario se enlaza directa y únicamente a los puertos). Conectar dos adaptadores entrelaza capas de salida de red y filtros de seguridad.
-- **Sugerencia de corrección:** Remover la dependencia de `security` sobre `web`. Cualquier información o contexto que los controladores de `web` requieran provenientes del token de seguridad (e.g., obtener el ID del usuario) debería pasarse o inyectarse sin depender compilatoriamente de los artefactos de `security` sino en el `domain`/`application`, y la configuración centralizada de arranque debe ir en el módulo `app-root`.
+- **Descripción de la infracción:** Según el POM, el adaptador `web` dependía directamente del adaptador `security`. La arquitectura hexagonal exige que los adaptadores se ignoren mutuamente (cada adaptador primario o secundario se enlaza directa y únicamente a los puertos). Conectar dos adaptadores entrelaza capas de salida de red y filtros de seguridad.
+- **Solución implementada:**
+  - ✅ Eliminada la dependencia de `security` del `pom.xml` de `web`
+  - ✅ Eliminadas todas las anotaciones `@PreAuthorize` de los controladores
+  - ✅ Eliminado el parámetro `Authentication` de los métodos de controladores
+  - ✅ Movidas las reglas de autorización a `SecurityConfig` usando `.requestMatchers()`
+  - ✅ Los servicios ahora usan `AuthenticationFacadePort` para obtener el usuario autenticado
+  - ✅ Eliminados los manejadores de excepciones de JWT y Spring Security del `DefaultExceptionHandler`
+  - ✅ Los errores de autenticación/autorización se manejan en el `AuthenticationEntryPoint` y `AccessDeniedHandler` configurados en `SecurityConfig`
+- **Resultado:** Los adaptadores `web` y `security` ahora están completamente desacoplados. La capa web solo conoce el dominio y los casos de uso, mientras que la seguridad se maneja exclusivamente en el módulo `security` y se configura en `app-root`.
 
 **2. Fuga de estructura de Repositorio a la capa Web**
 - **Archivo:** `c:\Projects\security-backend\web\src\main\java\com\matias\web\controller\AdminController.java`

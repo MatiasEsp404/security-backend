@@ -7,17 +7,11 @@ import com.matias.domain.exception.NoAutenticadoException;
 import com.matias.domain.exception.OperacionNoPermitidaException;
 import com.matias.domain.exception.RecursoNoEncontradoException;
 import com.matias.domain.exception.ServicioExternoException;
-import io.jsonwebtoken.ExpiredJwtException;
-import io.jsonwebtoken.JwtException;
-import io.jsonwebtoken.MalformedJwtException;
-import io.jsonwebtoken.UnsupportedJwtException;
-import io.jsonwebtoken.security.SignatureException;
 import java.util.List;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.support.DefaultMessageSourceResolvable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ControllerAdvice;
@@ -42,15 +36,6 @@ public class DefaultExceptionHandler {
 
         ErrorResponse response = new ErrorResponse("Datos de entrada no válidos", errors);
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
-    }
-
-    /**
-     * Maneja credenciales incorrectas en el login.
-     */
-    @ExceptionHandler(BadCredentialsException.class)
-    public ResponseEntity<ErrorResponse> handleBadCredentials(BadCredentialsException e) {
-        log.warn("Credenciales inválidas proporcionadas");
-        return buildResponse("Credenciales inválidas", "Usuario o contraseña incorrectos", HttpStatus.UNAUTHORIZED);
     }
 
     /**
@@ -99,37 +84,10 @@ public class DefaultExceptionHandler {
     }
 
     /**
-     * Errores JWT - Token inválido, expirado, malformado, etc.
-     */
-    @ExceptionHandler({
-            SignatureException.class,
-            MalformedJwtException.class,
-            ExpiredJwtException.class,
-            UnsupportedJwtException.class,
-            JwtException.class
-    })
-    public ResponseEntity<ErrorResponse> handleJwtErrors(Exception e) {
-        log.warn("Error JWT: {} - {}", e.getClass().getSimpleName(), e.getMessage());
-
-        String title = "Token inválido";
-        String detail;
-
-        detail = switch (e) {
-            case SignatureException ex -> "La firma del token no es válida";
-            case MalformedJwtException ex -> "El formato del token no es válido";
-            case ExpiredJwtException ex -> {
-                title = "Token expirado";
-                yield "El token ha expirado";
-            }
-            case UnsupportedJwtException ex -> "El tipo de token no es soportado";
-            default -> "Error al procesar el token";
-        };
-
-        return buildResponse(title, detail, HttpStatus.UNAUTHORIZED);
-    }
-
-    /**
      * Errores de servicios externos (email, APIs externas, etc.)
+     * 
+     * Nota: Los errores de JWT y autenticación son manejados por el 
+     * AuthenticationEntryPoint y AccessDeniedHandler configurados en SecurityConfig.
      */
     @ExceptionHandler(ServicioExternoException.class)
     public ResponseEntity<ErrorResponse> handleServicioExterno(ServicioExternoException e) {

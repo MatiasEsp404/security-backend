@@ -5,10 +5,9 @@ import com.matias.application.dto.response.UsuarioResponse;
 public interface UsuarioService {
 
     /**
-     * Obtiene la información completa de un usuario autenticado
+     * Obtiene la información completa del usuario actualmente autenticado
      *
-     * @param email Email del usuario autenticado
      * @return UsuarioResponse con la información del usuario
      */
-    UsuarioResponse obtenerInfoUsuario(String email);
+    UsuarioResponse obtenerInfoUsuario();
 }

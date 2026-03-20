@@ -39,8 +39,8 @@ Acts as the adapter for external email service providers.
 
 ### 6. `web` (Entry Point / API Presentation Layer)
 The visible face of the system towards external consumers.
-- **Contains:** Spring MVC Controllers (`@RestController`), Data Transfer Objects (DTOs) for requests and responses, endpoint validations, and role-based access annotations like `@PreAuthorize`.
-- **Dependencies:** `application` (to execute use cases) and `security` (to apply policies on who invokes the system). Relies on *spring-boot-starter-web*.
+- **Contains:** Spring MVC Controllers (`@RestController`), Data Transfer Objects (DTOs) for requests and responses, endpoint validations, and Swagger/OpenAPI annotations for API documentation.
+- **Dependencies:** `application` (to execute use cases). **Note:** Does NOT depend on `security` - authorization rules are centralized in `SecurityConfig` within the `security` module, following hexagonal architecture principles. Relies on *spring-boot-starter-web* and *springdoc-openapi*.
 
 ### 7. `app-root` (Bootstrap / Initializer)
 Configuration module that enables compilation and execution by assembling the entire system.
@@ -56,8 +56,8 @@ graph TD;
     Root(7. app-root) --> Web(6. web)
     Root --> DB(3. database)
     Root --> Email(5. email)
+    Root --> Sec(4. security)
     
-    Web --> Sec(4. security)
     Web --> App(2. application)
     
     Sec --> App
@@ -78,11 +78,14 @@ graph TD;
 
 ### Explaining the Flow:
 1. A request hits a `@RestController` in the **`web`** module.
-2. Optionally, the **`security`** module intercepts it first to validate JWT tokens or authorization (`@PreAuthorize`).
+2. The **`security`** module (configured in `app-root`) intercepts it first to validate JWT tokens and enforce authorization rules defined in `SecurityConfig` using `.requestMatchers()` and role-based access control.
 3. The Controller receives the request (adapted from a DTO) and invokes a service from the **`application`** module.
 4. **`application`** orchestrates the business logic utilizing classes and rules located in the **`domain`**.
 5. If `application` needs to retrieve or persist data, it will use a repository interface (Port) imported from `domain`.
 6. At runtime (Spring Injection), the container injects the implementation of that interface which was created and exists exclusively within the **`database`** module.
 7. If `application` needs to send emails, it will use the `EmailServicePort` interface from `domain`.
 8. At runtime, the container injects the appropriate implementation from the **`email`** module (SendGrid or SMTP based on configuration).
-9. All of the above is possible because the **`app-root`** module imports all dependencies in its `pom.xml`, enabling implicit classpath injection across the system in a single embedded startup environment.
+9. If `application` needs to obtain authenticated user information, it will use the `AuthenticationFacadePort` interface from `domain`, implemented by the **`security`** module.
+10. All of the above is possible because the **`app-root`** module imports all dependencies in its `pom.xml`, enabling implicit classpath injection across the system in a single embedded startup environment.
+
+**Important:** The **`web`** module has NO compile-time dependency on **`security`**. This ensures proper adapter decoupling following hexagonal architecture principles. Security filters and authentication/authorization are applied at runtime through Spring's filter chain, configured centrally in the `security` module.

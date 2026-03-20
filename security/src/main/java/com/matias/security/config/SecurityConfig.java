@@ -149,9 +149,14 @@ public class SecurityConfig {
                         "/v1/auth/refresh")
                 .permitAll()
 
-                // Endpoints de administración - solo ADMINISTRADOR
-                .requestMatchers("/v1/admin/**")
-                .hasRole(Rol.ADMINISTRADOR.name())
+                // Endpoints de administración
+                .requestMatchers("/api/admin/stats").hasRole(Rol.ADMINISTRADOR.name())
+                .requestMatchers("/api/admin/users").hasAnyRole(Rol.ADMINISTRADOR.name(), Rol.MODERADOR.name())
+                .requestMatchers("/api/admin/users/*").hasAnyRole(Rol.ADMINISTRADOR.name(), Rol.MODERADOR.name())
+                .requestMatchers("/api/admin/users/*/status").hasRole(Rol.ADMINISTRADOR.name())
+                .requestMatchers("/api/admin/users/*/roles/*").hasRole(Rol.ADMINISTRADOR.name())
+                .requestMatchers("/api/admin/users/*/audit").hasRole(Rol.ADMINISTRADOR.name())
+                .requestMatchers("/v1/admin/**").hasRole(Rol.ADMINISTRADOR.name())
 
                 // Endpoints de autenticación - usuarios autenticados
                 .requestMatchers("/v1/auth/**")
