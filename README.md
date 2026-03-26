@@ -46,7 +46,7 @@ Para correr la aplicación de manera local, la configuración predeterminada en 
    Corre la clase principal `SecurityBackendApplication` ubicada dentro del módulo `app-root`.
 3. **Explorar la API (Swagger UI):** 
    Una vez que la aplicación esté corriendo, puedes acceder a la interfaz de documentación interactiva en: 
-   👉 [http://localhost:8080/swagger-ui.html](http://localhost:8080/swagger-ui.html)
+   👉 [http://localhost:8080/swagger/swagger-ui/index.html](http://localhost:8080/swagger/swagger-ui/index.html)
 
 ---
 > 💡 *Para una documentación más extensa sobre la arquitectura o configuración del entorno, por favor consulta la documentación oficial en [DeepWiki](https://deepwiki.com/MatiasEsp404/security-backend).*

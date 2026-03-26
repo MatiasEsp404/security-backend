@@ -136,15 +136,7 @@ public class SecurityConfig {
                 // Endpoints públicos
                 .requestMatchers(
                         "/swagger/**",
-                        "/swagger-ui/**",
-                        "/swagger-ui.html",
-                        "/v3/api-docs/**",
-                        "/api-docs/**",
-                        "/api-docs",
-                        "/.well-known/**",
                         "/actuator/**",
-                        "/favicon.ico",
-                        "/error",
                         "/v1/auth/register",
                         "/v1/auth/verify",
                         "/v1/auth/login",
@@ -187,12 +179,6 @@ public class SecurityConfig {
                             "/v1/auth/resend-verification",
                             "/v1/auth/password-reset/**",
                             "/swagger/**",
-                            "/swagger-ui/**",
-                            "/swagger-ui.html",
-                            "/v3/api-docs/**",
-                            "/api-docs/**",
-                            "/api-docs",
-                            "/.well-known/**",
                             "/actuator/**");
             log.info("CSRF activado.");
         } else {
