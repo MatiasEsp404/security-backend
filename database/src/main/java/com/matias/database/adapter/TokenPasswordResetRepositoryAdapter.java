@@ -2,7 +2,7 @@ package com.matias.database.adapter;
 
 import com.matias.database.entity.UsuarioEntity;
 import com.matias.database.mapper.TokenPasswordResetMapper;
-import com.matias.database.mapper.UsuarioMapper;
+import com.matias.database.mapper.UsuarioEntityMapper;
 import com.matias.database.repository.TokenPasswordResetJpaRepository;
 import com.matias.domain.model.EstadoTokenVerificacion;
 import com.matias.domain.model.TokenPasswordReset;
@@ -21,7 +21,7 @@ public class TokenPasswordResetRepositoryAdapter implements TokenPasswordResetRe
 
     private final TokenPasswordResetJpaRepository jpaRepository;
     private final TokenPasswordResetMapper mapper;
-    private final UsuarioMapper usuarioMapper;
+    private final UsuarioEntityMapper usuarioMapper;
 
     @Override
     @Transactional

@@ -2,7 +2,7 @@ package com.matias.database.adapter;
 
 import com.matias.database.entity.UsuarioEntity;
 import com.matias.database.mapper.PasswordResetIntentoMapper;
-import com.matias.database.mapper.UsuarioMapper;
+import com.matias.database.mapper.UsuarioEntityMapper;
 import com.matias.database.repository.PasswordResetIntentoJpaRepository;
 import com.matias.domain.model.PasswordResetIntento;
 import com.matias.domain.model.Usuario;
@@ -20,7 +20,7 @@ public class PasswordResetIntentoRepositoryAdapter implements PasswordResetInten
 
     private final PasswordResetIntentoJpaRepository jpaRepository;
     private final PasswordResetIntentoMapper mapper;
-    private final UsuarioMapper usuarioMapper;
+    private final UsuarioEntityMapper usuarioMapper;
 
     @Override
     @Transactional

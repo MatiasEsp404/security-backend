@@ -7,6 +7,7 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import org.hibernate.envers.Audited;
 
 import java.time.Instant;
 
@@ -17,6 +18,7 @@ import java.time.Instant;
 @Builder
 @Entity
 @Table(name = "usuarios_roles")
+@Audited
 public class UsuarioRolEntity {
 
     @Id

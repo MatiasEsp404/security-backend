@@ -2,7 +2,7 @@ package com.matias.database.adapter;
 
 import com.matias.database.entity.UsuarioEntity;
 import com.matias.database.entity.UsuarioRolEntity;
-import com.matias.database.mapper.UsuarioMapper;
+import com.matias.database.mapper.UsuarioEntityMapper;
 import com.matias.database.repository.UsuarioJpaRepository;
 import com.matias.database.specification.UsuarioSpecification;
 import com.matias.domain.model.Rol;
@@ -27,7 +27,7 @@ import java.util.stream.Collectors;
 public class UsuarioRepositoryAdapter implements UsuarioRepositoryPort {
 
     private final UsuarioJpaRepository jpaRepository;
-    private final UsuarioMapper usuarioMapper;
+    private final UsuarioEntityMapper usuarioMapper;
 
     @Override
     public Optional<Usuario> findById(Integer id) {

@@ -12,7 +12,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 @Mapper(componentModel = "spring", uses = {UsuarioRolMapper.class})
-public interface UsuarioMapper {
+public interface UsuarioEntityMapper {
 
     @Mapping(target = "usuarioRoles", source = "usuarioRoles", qualifiedByName = "mapUsuarioRolesToDomain")
     Usuario toDomain(UsuarioEntity entity);
