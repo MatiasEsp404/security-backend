@@ -88,3 +88,15 @@ Este documento detalla los hallazgos tras la revisión exhaustiva de dependencia
   - ✅ Configurado mensaje de error personalizado que explica la violación de Arquitectura Hexagonal
   - ✅ La compilación falla automáticamente si alguien intenta agregar Lombok al módulo `domain`
 - **Garantía:** Con estas medidas, es arquitectónicamente imposible que Lombok se infiltre nuevamente en el módulo `domain`. Cualquier intento resultará en un fallo de compilación inmediato con mensaje explicativo.
+
+---
+
+## 🛡️ Verificación Final de Cumplimiento (25/03/2026)
+
+Tras la resolución de toda la deuda técnica enumerada anteriormente, se realizó un **nuevo escaneo general automatizado** sobre la base de código para garantizar el estricto cumplimiento de la Arquitectura Hexagonal:
+
+- **Módulo `domain`:** Se verificó la ausencia total de dependencias de frameworks (`org.springframework.*`, `jakarta.*`, `javax.*`, `lombok.*`) y de referencias a otros módulos del sistema. El núcleo es 100% Java puro.
+- **Módulo `application`:** Se confirmó que no hay fugas de infraestructura. No existen referencias a Spring Security, Servlet API, JPA, Swagger/OpenAPI, ni dependencias directas a módulos de base de datos, web o seguridad.
+- **Módulo `web`:** Se verificó que los controladores y servicios REST están completamente aislados de los detalles de persistencia y seguridad. No hay importaciones de repositorios, configuraciones de seguridad, ni detalles de base de datos filtrados a esta capa.
+
+**Conclusión:** El proyecto `security-backend` cumple al 100% con las reglas y principios de diseño establecidos en `architecture.md`. El flujo de dependencias se mantiene rígidamente unidireccional hacia el dominio, sin dependencias circulares ni fugas de abstracción, asegurando un sistema cohesivo, agnóstico y mantenible.
