@@ -64,7 +64,20 @@ Este documento detalla los hallazgos tras la revisión exhaustiva de dependencia
 ## 🟡 Infracciones LEVES
 *(Inconsistencias en el nombrado de puertos o adaptadores)*
 
-**1. Dependencias semi-externas en Domain (Lombok)**
-- **Archivo:** `c:\Projects\security-backend\domain\pom.xml` (y clases POJO como `Usuario.java`).
+**1. ~~Dependencias semi-externas en Domain (Lombok)~~ ✅ CORREGIDO**
+- **Archivo:** `c:\Projects\security-backend\domain\pom.xml` (y clases POJO como `Usuario.java`, `UsuarioRol.java`).
 - **Descripción de la infracción:** Se encontró el uso de metadatos `lombok.*` dentro del núcleo (`domain`). Bajo el purismo estricto de la Arquitectura Hexagonal, el modelaje de negocio debe sobrevivir si se desplaza entre contextos, y herramientas como Lombok son dependencias instrumentales de construcción en tiempo de compilación.
-- **Sugerencia de corrección:** Generalmente clasificado como *enfoque pragmático* válido, se aconseja simplemente dejar asentadas las razones en la documentación por las cuales Lombok constituye una excepción tolerada en las directrices de pureza del Dominio, de lo contrario reemplácelo con constructores y accesores puros.
+- **Solución implementada:**
+  - ✅ Eliminadas todas las anotaciones de Lombok (`@Data`, `@Builder`, `@AllArgsConstructor`, `@NoArgsConstructor`) de las clases del dominio
+  - ✅ Generado código Java puro en `Usuario.java`:
+    - Constructor vacío y constructor con todos los argumentos
+    - Getters y setters para todas las propiedades
+    - Métodos `equals()`, `hashCode()` y `toString()`
+    - Clase estática interna `Builder` para mantener el patrón Builder
+  - ✅ Generado código Java puro en `UsuarioRol.java`:
+    - Constructor vacío y constructor con todos los argumentos
+    - Getters y setters para todas las propiedades
+    - Métodos `equals()`, `hashCode()` y `toString()`
+    - Clase estática interna `Builder` para mantener el patrón Builder
+  - ✅ Verificada la compilación exitosa de todos los módulos del proyecto
+- **Resultado:** El módulo `domain` ahora es 100% Java puro, cumpliendo con el purismo de la Arquitectura Hexagonal. El modelo de negocio no depende de ninguna librería externa en tiempo de compilación o ejecución, asegurando su portabilidad y desacoplamiento total.
