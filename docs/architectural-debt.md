@@ -81,3 +81,10 @@ Este documento detalla los hallazgos tras la revisión exhaustiva de dependencia
     - Clase estática interna `Builder` para mantener el patrón Builder
   - ✅ Verificada la compilación exitosa de todos los módulos del proyecto
 - **Resultado:** El módulo `domain` ahora es 100% Java puro, cumpliendo con el purismo de la Arquitectura Hexagonal. El modelo de negocio no depende de ninguna librería externa en tiempo de compilación o ejecución, asegurando su portabilidad y desacoplamiento total.
+- **Protección arquitectónica implementada (25/03/2026):**
+  - ✅ Movida la dependencia de Lombok del bloque `<dependencies>` al bloque `<dependencyManagement>` en el POM padre
+  - ✅ Añadida dependencia explícita de Lombok en los módulos que la necesitan: `application`, `web`, `database`, `security`, `email`
+  - ✅ Añadido `maven-enforcer-plugin` v3.5.0 en `domain/pom.xml` con regla `<bannedDependencies>` para excluir `org.projectlombok:lombok`
+  - ✅ Configurado mensaje de error personalizado que explica la violación de Arquitectura Hexagonal
+  - ✅ La compilación falla automáticamente si alguien intenta agregar Lombok al módulo `domain`
+- **Garantía:** Con estas medidas, es arquitectónicamente imposible que Lombok se infiltre nuevamente en el módulo `domain`. Cualquier intento resultará en un fallo de compilación inmediato con mensaje explicativo.

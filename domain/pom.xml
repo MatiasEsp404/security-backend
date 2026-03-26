@@ -8,4 +8,39 @@
 		<version>0.0.1-SNAPSHOT</version>
 	</parent>
 	<artifactId>domain</artifactId>
+
+	<build>
+		<plugins>
+			<!-- Maven Enforcer Plugin para prevenir dependencias prohibidas -->
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-enforcer-plugin</artifactId>
+				<version>3.5.0</version>
+				<executions>
+					<execution>
+						<id>ban-lombok-in-domain</id>
+						<goals>
+							<goal>enforce</goal>
+						</goals>
+						<configuration>
+							<rules>
+								<bannedDependencies>
+									<excludes>
+										<exclude>org.projectlombok:lombok</exclude>
+									</excludes>
+									<message>
+										❌ ARQUITECTURA HEXAGONAL VIOLADA ❌
+										Lombok está prohibido en el módulo 'domain'.
+										El dominio debe ser 100% Java puro, sin dependencias externas.
+										Por favor, remueve la dependencia de Lombok del domain/pom.xml.
+									</message>
+								</bannedDependencies>
+							</rules>
+							<fail>true</fail>
+						</configuration>
+					</execution>
+				</executions>
+			</plugin>
+		</plugins>
+	</build>
 </project>
