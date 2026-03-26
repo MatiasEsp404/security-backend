@@ -1,5 +1,6 @@
 package com.matias.database.adapter;
 
+import com.matias.database.entity.TokenPasswordResetEntity;
 import com.matias.database.entity.UsuarioEntity;
 import com.matias.database.mapper.TokenPasswordResetMapper;
 import com.matias.database.mapper.UsuarioEntityMapper;
@@ -26,8 +27,8 @@ public class TokenPasswordResetRepositoryAdapter implements TokenPasswordResetRe
     @Override
     @Transactional
     public TokenPasswordReset save(TokenPasswordReset token) {
-        var entity = mapper.toEntity(token);
-        var savedEntity = jpaRepository.save(entity);
+        TokenPasswordResetEntity entity = mapper.toEntity(token);
+        TokenPasswordResetEntity savedEntity = jpaRepository.save(entity);
         return mapper.toDomain(savedEntity);
     }
 

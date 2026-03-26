@@ -1,5 +1,6 @@
 package com.matias.web.controller;
 
+import com.matias.application.dto.response.UsuarioResponse;
 import com.matias.application.service.UsuarioService;
 import com.matias.web.dto.response.UsuarioWebResponse;
 import com.matias.web.mapper.UsuarioWebMapper;
@@ -34,8 +35,8 @@ public class UsuarioController {
     })
     @GetMapping("/me")
     public ResponseEntity<UsuarioWebResponse> obtenerInfoUsuarioActual() {
-        var appResponse = usuarioService.obtenerInfoUsuario();
-        var webResponse = usuarioWebMapper.toUsuarioWebResponse(appResponse);
+        UsuarioResponse appResponse = usuarioService.obtenerInfoUsuario();
+        UsuarioWebResponse webResponse = usuarioWebMapper.toUsuarioWebResponse(appResponse);
         return ResponseEntity.ok(webResponse);
     }
 }

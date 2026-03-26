@@ -9,6 +9,7 @@ import org.hibernate.envers.AuditReader;
 import org.hibernate.envers.AuditReaderFactory;
 import org.hibernate.envers.RevisionType;
 import org.hibernate.envers.query.AuditEntity;
+import org.hibernate.envers.query.AuditQuery;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Repository;
 
@@ -44,7 +45,7 @@ public class UsuarioAuditRepositoryAdapter implements UsuarioAuditRepositoryPort
         int offset = pageRequest.pageNumber() * pageRequest.pageSize();
 
         // Construir query con ordenamiento
-        var query = auditReader.createQuery()
+        AuditQuery query = auditReader.createQuery()
                 .forRevisionsOfEntity(UsuarioEntity.class, false, true)
                 .add(AuditEntity.id().eq(usuarioId));
         

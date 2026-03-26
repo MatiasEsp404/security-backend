@@ -1,5 +1,6 @@
 package com.matias.database.adapter;
 
+import com.matias.database.entity.TokenInvalidoEntity;
 import com.matias.database.mapper.TokenInvalidoMapper;
 import com.matias.database.repository.TokenInvalidoJpaRepository;
 import com.matias.domain.model.TokenInvalido;
@@ -30,8 +31,8 @@ public class TokenInvalidoRepositoryAdapter implements TokenInvalidoRepositoryPo
     @Override
     @Transactional
     public TokenInvalido invalidar(TokenInvalido tokenInvalido) {
-        var entity = mapper.toEntity(tokenInvalido);
-        var savedEntity = jpaRepository.save(entity);
+        TokenInvalidoEntity entity = mapper.toEntity(tokenInvalido);
+        TokenInvalidoEntity savedEntity = jpaRepository.save(entity);
         return mapper.toDomain(savedEntity);
     }
     

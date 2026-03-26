@@ -1,5 +1,6 @@
 package com.matias.database.adapter;
 
+import com.matias.database.entity.PasswordResetIntentoEntity;
 import com.matias.database.entity.UsuarioEntity;
 import com.matias.database.mapper.PasswordResetIntentoMapper;
 import com.matias.database.mapper.UsuarioEntityMapper;
@@ -25,8 +26,8 @@ public class PasswordResetIntentoRepositoryAdapter implements PasswordResetInten
     @Override
     @Transactional
     public PasswordResetIntento save(PasswordResetIntento intento) {
-        var entity = mapper.toEntity(intento);
-        var savedEntity = jpaRepository.save(entity);
+        PasswordResetIntentoEntity entity = mapper.toEntity(intento);
+        PasswordResetIntentoEntity savedEntity = jpaRepository.save(entity);
         return mapper.toDomain(savedEntity);
     }
 

@@ -4,6 +4,9 @@ import com.matias.application.service.AuthService;
 import com.matias.application.service.PasswordResetService;
 import com.matias.application.dto.internal.TokenInternal;
 import com.matias.application.dto.request.ReenvioEmailRequest;
+import com.matias.application.dto.request.RegistroRequest;
+import com.matias.application.dto.response.RegistroResponse;
+import com.matias.application.dto.request.LogueoRequest;
 import com.matias.web.dto.request.ConfirmarResetPasswordRequest;
 import com.matias.web.dto.request.LogueoWebRequest;
 import com.matias.web.dto.request.RegistroWebRequest;
@@ -60,9 +63,9 @@ public class AuthController {
     })
     @PostMapping("/register")
     public ResponseEntity<RegistroWebResponse> register(@Valid @RequestBody RegistroWebRequest webRequest) {
-        var appRequest = authWebMapper.toRegistroRequest(webRequest);
-        var appResponse = authService.register(appRequest);
-        var webResponse = authWebMapper.toRegistroWebResponse(appResponse);
+        RegistroRequest appRequest = authWebMapper.toRegistroRequest(webRequest);
+        RegistroResponse appResponse = authService.register(appRequest);
+        RegistroWebResponse webResponse = authWebMapper.toRegistroWebResponse(appResponse);
         URI location = ServletUriComponentsBuilder
                 .fromCurrentContextPath()
                 .path("/api/v1/usuario/me")
@@ -79,10 +82,10 @@ public class AuthController {
     })
     @PostMapping("/login")
     public ResponseEntity<TokenWebResponse> login(@Valid @RequestBody LogueoWebRequest webRequest, HttpServletResponse response) {
-        var appRequest = authWebMapper.toLogueoRequest(webRequest);
+        LogueoRequest appRequest = authWebMapper.toLogueoRequest(webRequest);
         TokenInternal tokens = authService.login(appRequest);
         addRefreshTokenCookie(response, tokens.refreshToken(), Duration.ofDays(7));
-        var webResponse = authWebMapper.toTokenWebResponse(new com.matias.application.dto.response.TokenResponse(tokens.accessToken()));
+        TokenWebResponse webResponse = authWebMapper.toTokenWebResponse(new com.matias.application.dto.response.TokenResponse(tokens.accessToken()));
         return ResponseEntity.ok(webResponse);
     }
 
@@ -103,7 +106,7 @@ public class AuthController {
         }
         TokenInternal tokens = authService.refresh(refreshToken);
         addRefreshTokenCookie(response, tokens.refreshToken(), Duration.ofDays(7));
-        var webResponse = authWebMapper.toTokenWebResponse(new com.matias.application.dto.response.TokenResponse(tokens.accessToken()));
+        TokenWebResponse webResponse = authWebMapper.toTokenWebResponse(new com.matias.application.dto.response.TokenResponse(tokens.accessToken()));
         return ResponseEntity.ok(webResponse);
     }
 
