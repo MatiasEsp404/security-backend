@@ -42,10 +42,22 @@ Este documento detalla los hallazgos tras la revisión exhaustiva de dependencia
   - ✅ Los errores de autenticación/autorización se manejan en el `AuthenticationEntryPoint` y `AccessDeniedHandler` configurados en `SecurityConfig`
 - **Resultado:** Los adaptadores `web` y `security` ahora están completamente desacoplados. La capa web solo conoce el dominio y los casos de uso, mientras que la seguridad se maneja exclusivamente en el módulo `security` y se configura en `app-root`.
 
-**2. Fuga de estructura de Repositorio a la capa Web**
+**2. ~~Fuga de estructura de Repositorio a la capa Web~~ ✅ CORREGIDO**
 - **Archivo:** `c:\Projects\security-backend\web\src\main\java\com\matias\web\controller\AdminController.java`
-- **Descripción de la infracción:** El controlador `AdminController`, aunque llama a `AdminService` y no inyecta bibliotecas JPA directas, importa los objetos `UsuarioRepositoryPort.UsuarioFilter` o `UsuarioRepositoryPort.PageRequest` definidos directamente en el interior del puerto de base de datos. Esto significa que el adaptador de interfaz de usuario sabe de "filtros de repositorio" destinados a adaptadores secundarios, violando la separación de intenciones.
-- **Sugerencia de corrección:** Re-definir comandos o consultas limpios en `application` (por ejemplo: `SearchUsersQuery`), y proveer en su lugar de los objetos de filtro/paginación dedicados exclusivamente a inyectar información al `AdminService`, impidiendo que el controlador deba armar los objetos internos estipulados para el servicio de repositorios.
+- **Descripción de la infracción:** El controlador `AdminController`, aunque llama a `AdminService` y no inyecta bibliotecas JPA directas, importaba los objetos `UsuarioRepositoryPort.UsuarioFilter` o `UsuarioRepositoryPort.PageRequest` definidos directamente en el interior del puerto de base de datos. Esto significaba que el adaptador de interfaz de usuario sabía de "filtros de repositorio" destinados a adaptadores secundarios, violando la separación de intenciones.
+- **Solución implementada:**
+  - ✅ Creados objetos dedicados en la capa `application` para filtrado y paginación:
+    - `SearchUsersQuery`: Query para buscar usuarios con filtros (search, activo, emailVerificado, roles, fechas)
+    - `PageQuery`: Query genérico para paginación y ordenamiento
+    - `AuditPageQuery`: Query para paginación de auditoría
+    - `PageResult<T>`: Resultado paginado genérico para la capa de aplicación
+  - ✅ Refactorizado `AdminController` para construir y utilizar los nuevos objetos de aplicación
+  - ✅ Refactorizado `AdminService` y `AdminServiceImpl` para:
+    - Recibir los objetos de aplicación (`SearchUsersQuery`, `PageQuery`, `AuditPageQuery`)
+    - Mapear internamente estos objetos hacia los objetos del repositorio (`UsuarioFilter`, `PageRequest`)
+    - Retornar `PageResult` de aplicación en lugar de `PageResult` del repositorio
+  - ✅ Eliminadas todas las importaciones de objetos del repositorio (`UsuarioRepositoryPort.*`, `UsuarioAuditRepositoryPort.*`) del `AdminController`
+- **Resultado:** El controlador Web ahora está completamente desacoplado de los detalles del repositorio. La capa de aplicación actúa como puente exclusivo, encargándose del mapeo entre los objetos de la capa web y los objetos del puerto de persistencia, respetando la separación de responsabilidades de la arquitectura hexagonal.
 
 ---
 

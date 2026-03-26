@@ -1,10 +1,12 @@
 package com.matias.application.service;
 
+import com.matias.application.dto.internal.AuditPageQuery;
+import com.matias.application.dto.internal.PageQuery;
+import com.matias.application.dto.internal.PageResult;
+import com.matias.application.dto.internal.SearchUsersQuery;
 import com.matias.domain.model.Rol;
 import com.matias.domain.model.Usuario;
 import com.matias.domain.model.UsuarioAudit;
-import com.matias.domain.port.UsuarioAuditRepositoryPort;
-import com.matias.domain.port.UsuarioRepositoryPort;
 
 import java.util.Map;
 
@@ -16,14 +18,8 @@ public interface AdminService {
     
     // Nuevos métodos para administración
     Map<String, Object> obtenerEstadisticas();
-    UsuarioRepositoryPort.PageResult<Usuario> buscarUsuarios(
-            UsuarioRepositoryPort.UsuarioFilter filter,
-            UsuarioRepositoryPort.PageRequest pageRequest
-    );
+    PageResult<Usuario> buscarUsuarios(SearchUsersQuery query, PageQuery pageQuery);
     
     // Auditoría
-    UsuarioAuditRepositoryPort.PageResult<UsuarioAudit> obtenerHistorialUsuario(
-            Integer userId, 
-            UsuarioAuditRepositoryPort.PageRequest pageRequest
-    );
+    PageResult<UsuarioAudit> obtenerHistorialUsuario(Integer userId, AuditPageQuery pageQuery);
 }

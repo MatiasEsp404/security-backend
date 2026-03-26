@@ -1,5 +1,9 @@
 package com.matias.application.service.impl;
 
+import com.matias.application.dto.internal.AuditPageQuery;
+import com.matias.application.dto.internal.PageQuery;
+import com.matias.application.dto.internal.PageResult;
+import com.matias.application.dto.internal.SearchUsersQuery;
 import com.matias.application.service.AdminService;
 import com.matias.domain.exception.ConflictoException;
 import com.matias.domain.exception.OperacionNoPermitidaException;
@@ -97,19 +101,69 @@ public class AdminServiceImpl implements AdminService {
     }
 
     @Override
-    public UsuarioRepositoryPort.PageResult<Usuario> buscarUsuarios(
-            UsuarioRepositoryPort.UsuarioFilter filter,
-            UsuarioRepositoryPort.PageRequest pageRequest) {
-        return usuarioRepository.findAllWithFilters(filter, pageRequest);
+    public PageResult<Usuario> buscarUsuarios(SearchUsersQuery query, PageQuery pageQuery) {
+        // Mapear query de aplicación a filtro de repositorio
+        UsuarioRepositoryPort.UsuarioFilter filter = new UsuarioRepositoryPort.UsuarioFilter(
+            query.search(),
+            query.activo(),
+            query.emailVerificado(),
+            query.roles(),
+            query.fechaDesde(),
+            query.fechaHasta()
+        );
+
+        // Mapear paginación de aplicación a paginación de repositorio
+        UsuarioRepositoryPort.PageRequest pageRequest = new UsuarioRepositoryPort.PageRequest(
+            pageQuery.page(),
+            pageQuery.size(),
+            pageQuery.sortBy(),
+            pageQuery.direction() == PageQuery.SortDirection.ASC 
+                ? UsuarioRepositoryPort.SortDirection.ASC 
+                : UsuarioRepositoryPort.SortDirection.DESC
+        );
+
+        // Ejecutar consulta
+        UsuarioRepositoryPort.PageResult<Usuario> result = usuarioRepository.findAllWithFilters(filter, pageRequest);
+
+        // Mapear resultado de repositorio a resultado de aplicación
+        return new PageResult<>(
+            result.content(),
+            result.pageNumber(),
+            result.pageSize(),
+            result.totalElements(),
+            result.totalPages(),
+            result.isFirst(),
+            result.isLast()
+        );
     }
 
     @Override
-    public UsuarioAuditRepositoryPort.PageResult<UsuarioAudit> obtenerHistorialUsuario(
-            Integer userId, 
-            UsuarioAuditRepositoryPort.PageRequest pageRequest) {
+    public PageResult<UsuarioAudit> obtenerHistorialUsuario(Integer userId, AuditPageQuery pageQuery) {
         // Verificar que el usuario existe
         obtenerDetalleUsuario(userId);
-        
-        return usuarioAuditRepository.findAuditByUsuarioId(userId, pageRequest);
+
+        // Mapear paginación de aplicación a paginación de repositorio
+        UsuarioAuditRepositoryPort.PageRequest pageRequest = new UsuarioAuditRepositoryPort.PageRequest(
+            pageQuery.page(),
+            pageQuery.size(),
+            pageQuery.direction() == AuditPageQuery.SortDirection.ASC
+                ? UsuarioAuditRepositoryPort.SortDirection.ASC
+                : UsuarioAuditRepositoryPort.SortDirection.DESC
+        );
+
+        // Ejecutar consulta
+        UsuarioAuditRepositoryPort.PageResult<UsuarioAudit> result = 
+            usuarioAuditRepository.findAuditByUsuarioId(userId, pageRequest);
+
+        // Mapear resultado de repositorio a resultado de aplicación
+        return new PageResult<>(
+            result.content(),
+            result.pageNumber(),
+            result.pageSize(),
+            result.totalElements(),
+            result.totalPages(),
+            result.isFirst(),
+            result.isLast()
+        );
     }
 }

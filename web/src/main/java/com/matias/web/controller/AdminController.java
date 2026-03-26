@@ -1,11 +1,13 @@
 package com.matias.web.controller;
 
+import com.matias.application.dto.internal.AuditPageQuery;
+import com.matias.application.dto.internal.PageQuery;
+import com.matias.application.dto.internal.PageResult;
+import com.matias.application.dto.internal.SearchUsersQuery;
 import com.matias.application.service.AdminService;
 import com.matias.domain.model.Rol;
 import com.matias.domain.model.Usuario;
 import com.matias.domain.model.UsuarioAudit;
-import com.matias.domain.port.UsuarioAuditRepositoryPort;
-import com.matias.domain.port.UsuarioRepositoryPort;
 import com.matias.web.dto.request.UpdateUserStatusRequest;
 import com.matias.web.dto.request.UsuarioFilterRequest;
 import com.matias.web.dto.response.PageResponse;
@@ -86,27 +88,28 @@ public class AdminController {
             @Parameter(description = "Campo de ordenamiento") @RequestParam(defaultValue = "fechaCreacion") String sortBy,
             @Parameter(description = "Dirección de ordenamiento") @RequestParam(defaultValue = "DESC") String direction
     ) {
-        // Convertir filtros
-        UsuarioRepositoryPort.UsuarioFilter filter = new UsuarioRepositoryPort.UsuarioFilter(
-            search,
-            activo,
-            emailVerificado,
-            roles != null ? roles.stream().collect(Collectors.toSet()) : null,
-            fechaDesde != null ? java.time.Instant.parse(fechaDesde) : null,
-            fechaHasta != null ? java.time.Instant.parse(fechaHasta) : null
-        );
+        // Construir query de búsqueda
+        SearchUsersQuery searchQuery = SearchUsersQuery.builder()
+            .search(search)
+            .activo(activo)
+            .emailVerificado(emailVerificado)
+            .roles(roles != null ? roles.stream().collect(Collectors.toSet()) : null)
+            .fechaDesde(fechaDesde != null ? java.time.Instant.parse(fechaDesde) : null)
+            .fechaHasta(fechaHasta != null ? java.time.Instant.parse(fechaHasta) : null)
+            .build();
 
-        UsuarioRepositoryPort.PageRequest pageRequest = new UsuarioRepositoryPort.PageRequest(
-            page,
-            size,
-            sortBy,
-            "ASC".equalsIgnoreCase(direction) 
-                ? UsuarioRepositoryPort.SortDirection.ASC 
-                : UsuarioRepositoryPort.SortDirection.DESC
-        );
+        // Construir query de paginación
+        PageQuery pageQuery = PageQuery.builder()
+            .page(page)
+            .size(size)
+            .sortBy(sortBy)
+            .direction("ASC".equalsIgnoreCase(direction) 
+                ? PageQuery.SortDirection.ASC 
+                : PageQuery.SortDirection.DESC)
+            .build();
 
         // Ejecutar búsqueda
-        UsuarioRepositoryPort.PageResult<Usuario> result = adminService.buscarUsuarios(filter, pageRequest);
+        PageResult<Usuario> result = adminService.buscarUsuarios(searchQuery, pageQuery);
 
         // Convertir a DTO
         List<UsuarioListItemResponse> content = result.content().stream()
@@ -220,15 +223,17 @@ public class AdminController {
             @Parameter(description = "Tamaño de página") @RequestParam(defaultValue = "20") int size,
             @Parameter(description = "Dirección de ordenamiento") @RequestParam(defaultValue = "DESC") String direction
     ) {
-        UsuarioAuditRepositoryPort.SortDirection sortDirection = "ASC".equalsIgnoreCase(direction) 
-            ? UsuarioAuditRepositoryPort.SortDirection.ASC 
-            : UsuarioAuditRepositoryPort.SortDirection.DESC;
+        // Construir query de paginación para auditoría
+        AuditPageQuery pageQuery = AuditPageQuery.builder()
+            .page(page)
+            .size(size)
+            .direction("ASC".equalsIgnoreCase(direction) 
+                ? AuditPageQuery.SortDirection.ASC 
+                : AuditPageQuery.SortDirection.DESC)
+            .build();
         
-        UsuarioAuditRepositoryPort.PageRequest pageRequest = 
-            new UsuarioAuditRepositoryPort.PageRequest(page, size, sortDirection);
-        
-        UsuarioAuditRepositoryPort.PageResult<UsuarioAudit> auditPage = 
-            adminService.obtenerHistorialUsuario(userId, pageRequest);
+        // Ejecutar consulta
+        PageResult<UsuarioAudit> auditPage = adminService.obtenerHistorialUsuario(userId, pageQuery);
         
         // Convertir a DTO
         List<UsuarioAuditResponse> content = auditPage.content().stream()
