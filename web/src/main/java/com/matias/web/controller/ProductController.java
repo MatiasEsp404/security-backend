@@ -19,7 +19,7 @@ import java.util.stream.Collectors;
 
 @Tag(name = "Productos", description = "Endpoints para gestión de productos (ejemplo CRUD)")
 @RestController
-@RequestMapping("/api/products")
+@RequestMapping("/products")
 public class ProductController {
 
     private final ProductService productService;

@@ -137,14 +137,14 @@ public class SecurityConfig {
                 .requestMatchers(
                         "/swagger/**",
                         "/actuator/**",
-                        "/v1/auth/register",
-                        "/v1/auth/verify",
-                        "/v1/auth/login",
-                        "/v1/auth/resend-verification",
-                        "/v1/auth/password-reset/request",
-                        "/v1/auth/password-reset/validate",
-                        "/v1/auth/password-reset/confirm",
-                        "/v1/auth/refresh")
+                        "/api/v1/auth/register",
+                        "/api/v1/auth/verify",
+                        "/api/v1/auth/login",
+                        "/api/v1/auth/resend-verification",
+                        "/api/v1/auth/password-reset/request",
+                        "/api/v1/auth/password-reset/validate",
+                        "/api/v1/auth/password-reset/confirm",
+                        "/api/v1/auth/refresh")
                 .permitAll()
 
                 // Endpoints de administración
@@ -154,14 +154,14 @@ public class SecurityConfig {
                 .requestMatchers("/api/admin/users/*/status").hasRole(Rol.ADMINISTRADOR.name())
                 .requestMatchers("/api/admin/users/*/roles/*").hasRole(Rol.ADMINISTRADOR.name())
                 .requestMatchers("/api/admin/users/*/audit").hasRole(Rol.ADMINISTRADOR.name())
-                .requestMatchers("/v1/admin/**").hasRole(Rol.ADMINISTRADOR.name())
+                .requestMatchers("/api/v1/admin/**").hasRole(Rol.ADMINISTRADOR.name())
 
                 // Endpoints de autenticación - usuarios autenticados
-                .requestMatchers("/v1/auth/**")
+                .requestMatchers("/api/v1/auth/**")
                 .hasAnyRole(Rol.USUARIO.name(), Rol.MODERADOR.name(), Rol.ADMINISTRADOR.name())
 
                 // Endpoints de usuario - usuarios autenticados
-                .requestMatchers("/v1/usuario/me")
+                .requestMatchers("/api/v1/usuario/me")
                 .hasAnyRole(Rol.USUARIO.name(), Rol.MODERADOR.name(), Rol.ADMINISTRADOR.name())
 
                 // Cualquier otro endpoint requiere autenticación
@@ -173,11 +173,11 @@ public class SecurityConfig {
             csrf.csrfTokenRepository(CookieCsrfTokenRepository.withHttpOnlyFalse())
                     .csrfTokenRequestHandler(new SpaCsrfTokenRequestHandler())
                     .ignoringRequestMatchers(
-                            "/v1/auth/register",
-                            "/v1/auth/login",
-                            "/v1/auth/verify",
-                            "/v1/auth/resend-verification",
-                            "/v1/auth/password-reset/**",
+                            "/api/v1/auth/register",
+                            "/api/v1/auth/login",
+                            "/api/v1/auth/verify",
+                            "/api/v1/auth/resend-verification",
+                            "/api/v1/auth/password-reset/**",
                             "/swagger/**",
                             "/actuator/**");
             log.info("CSRF activado.");
