@@ -27,6 +27,7 @@ import com.matias.domain.util.DataNormalizer;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -143,14 +144,15 @@ public class AuthServiceImpl implements AuthService {
     }
 
     @Override
+    @Transactional(readOnly = true)
     public TokenInternal login(LogueoRequest request) {
         log.info("Intento de login para email: {}", request.email());
         
         // Normalizar email para búsqueda
         String emailNormalizado = DataNormalizer.normalizeEmail(request.email());
         
-        // Buscar usuario
-        Usuario usuario = usuarioRepository.findByEmail(emailNormalizado)
+        // Buscar usuario con roles (necesarios para generar el access token)
+        Usuario usuario = usuarioRepository.findByEmailWithRoles(emailNormalizado)
                 .orElseThrow(() -> new NoAutenticadoException("Credenciales inválidas"));
 
         // Verificar contraseña
@@ -175,6 +177,7 @@ public class AuthServiceImpl implements AuthService {
     }
 
     @Override
+    @Transactional(readOnly = true)
     public TokenInternal refresh(String refreshToken) {
         log.info("Intento de refresh token");
         
@@ -186,8 +189,8 @@ public class AuthServiceImpl implements AuthService {
         // Obtener email del token
         String email = tokenService.extractEmail(refreshToken);
         
-        // Buscar usuario
-        Usuario usuario = usuarioRepository.findByEmail(email)
+        // Buscar usuario con roles
+        Usuario usuario = usuarioRepository.findByEmailWithRoles(email)
                 .orElseThrow(() -> new RecursoNoEncontradoException("Usuario no encontrado"));
 
         // Generar nuevos tokens
